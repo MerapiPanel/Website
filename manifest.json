@@ -1,6 +1,10 @@
 {
   "name": "Website",
   "description": "Website module",
+  "github": {
+    "user": "MerapiPanel",
+    "repo": "Website"
+  },
   "version": "0.1.1",
   "author": "Il4mb",
   "icon": "./icon.svg"
