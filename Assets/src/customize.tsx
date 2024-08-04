@@ -1,12 +1,14 @@
+import React, { createContext, useState } from "react";
+import ReactDOM from "react-dom/client";
 import { AddComponentTypeOptions, BlockManagerConfig, Component, Editor, EditorConfig } from "grapesjs";
 import { __MP } from "../../../../Buildin/src/main";
-import * as Pages from "./plugins/Pages";
+// import * as Pages from "./plugins/Pages";
 import * as Fragments from "./plugins/Patterns";
 import { GAssets, TAsset } from "./components/gassets";
 
-import React, { createContext, useState } from "react";
-import ReactDOM from "react-dom/client";
+
 import Listenner from "./components/gassets/Listenner";
+import Pages2 from "./plugins/Pages2";
 
 const editor: {
     config: EditorConfig,
@@ -369,23 +371,26 @@ function initPagesManager(editor: Editor) {
     const pagesContainer = $(`<div class="editor-layout pages-manager hide p-2 flex-wrap gap-2">`);
     $(".editor-sidebar").append(pagesContainer);
 
-    Pages.Register(editor, {
-        appendTo: ".pages-manager",
-        pages: __.website.pages || []
-    });
     editor.Commands.add("pages:test-variable", {
         run: function (editor, sender, opts) {
-            return __.website.testVariable?.(opts);
+            return __.Website.testVariable?.(opts);
         }
     });
     editor.Commands.add("pages:delete", {
         run: function (editor, sender, opts) {
-            return __.website.deletePage?.(opts);
+            return __.Website.deletePage?.(opts);
         }
     });
+
+    ReactDOM.createRoot(pagesContainer[0] as any)
+        .render(
+            <React.StrictMode>
+                <Pages2 editor={editor} />
+            </React.StrictMode>
+        )
 }
 
-function initFragmentsManager(editor: Editor) {
+function initPatternsManager(editor: Editor) {
 
     editor.Panels.addButton("sidebar-panel", {
         id: "patterns",
@@ -497,48 +502,10 @@ function loadGlobalAssets(editor: Editor) {
  * On PostSave Callback
  */
 editor.callback = function () {
-
-    const gjsEditor: Editor = this.editor;
-    const page = gjsEditor.runCommand("pages:save");
-    const formData = new FormData();
-
-    Object.keys(page).forEach((key) => {
-        const value = page[key];
-        if (typeof value == "object" && !Array.isArray(value)) {
-            formData.append(key, JSON.stringify(value));
-        } else if (Array.isArray(value)) {
-            for (let i = 0; i < value.length; i++) {
-                let item = value[i];
-                if (typeof item == "object" || Array.isArray(item)) {
-                    Object.keys(item).forEach((k) => {
-                        formData.append(`${key}[${i}][${k}]`, item[k]);
-                    });
-                } else {
-                    formData.append(`${key}[${i}]`, item);
-                }
-            }
-        } else {
-            formData.append(key, page[key]);
-        }
-    });
-
-    __.http.post(__.website.saveURL, formData)
-        .then((result) => {
-
-            if ((result as any).status) {
-                this.resolve(result.message || "Page saved", 5, 'text-success');
-                const find = __.website.pages.find((x) => x.route == (result.data as any).route);
-                if (find) {
-                    Object.keys(result.data).forEach((key) => {
-                        find[key] = result.data[key];
-                    });
-                }
-            } else {
-                this.reject(result.message || "Failed to save page", 5, 'text-danger');
-            }
-        }).catch((error) => {
-            this.reject(error || "Failed to save page", 5, 'text-danger');
-        });
+    if (typeof __.Editor.callbackHandler == "function") {
+        return __.Editor.callbackHandler.call(this);
+    }
+    this.react("Invalid callback editor");
 }
 
 
@@ -547,7 +514,7 @@ editor.onReady = function (editor: Editor) {
     const { BlockManager, Components, Panels } = editor;
 
     initTwigComponents(BlockManager, Components);
-    initFragmentsManager(editor);
+    initPatternsManager(editor);
     initPagesManager(editor);
     loadGlobalAssets(editor);
 }

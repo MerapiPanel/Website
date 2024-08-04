@@ -1,3 +1,6 @@
+import React, { createContext, useState } from "react";
+import ReactDOM from "react-dom/client";
+
 import { Editor, Pages } from "grapesjs";
 import { EditorView, basicSetup, minimalSetup } from 'codemirror';
 import { autocompletion } from "@codemirror/autocomplete";
@@ -8,9 +11,16 @@ import { __MP } from "../../../../../Buildin/src/main";
 const __: __MP = (window as any).__;
 
 
+type TPageProp = {
+    type: ["string", "color", "file"]
+    name: string
+    label: string
+}
+
+
 type Page = {
     id?: string
-    name?: string
+    name: string
     title: string
     description: string | undefined | null
     route: string
@@ -24,6 +34,8 @@ type Page = {
     post_date?: string
     update_date?: string
     isChanged?: boolean
+    removable: boolean
+    properties: TPageProp[]
 }
 
 export const Register = (editor: Editor, opts: {
@@ -33,8 +45,6 @@ export const Register = (editor: Editor, opts: {
 
 
     var customizePage: Page | null = null;
-
-
     editor.Commands.add("pages:save", {
         run: function () {
             if (customizePage) {
@@ -46,7 +56,6 @@ export const Register = (editor: Editor, opts: {
             return customizePage;
         }
     });
-
     editor.Commands.add("pages:customize", {
 
         run: function (editor, sender, opts) {
@@ -76,9 +85,39 @@ export const Register = (editor: Editor, opts: {
     });
 
 
+    if (!customizePage) {
+        const storageCustomizePage = window.localStorage.getItem('customize-page');
+        if (storageCustomizePage) {
+            const spage = JSON.parse(storageCustomizePage);
+            let find = opts.pages?.find(page => {
+                let id = spage.id || null;
+                let route = spage.route || null;
+                if (id) {
+                    return id == page.id;
+                } else if (route) {
+                    return route == page.route;
+                }
+            });
+
+            if (find) customize(find);
+            else {
+                let find = opts.pages?.find(page => page.name.toLowerCase() == "index");
+                if (find) customize(find);
+            }
+        } else {
+            let find = opts.pages?.find(page => page.name.toLowerCase() == "index");
+            if (find) customize(find);
+        }
+    }
+    render();
+
+    $(".editor-canvas-wrapper").append(
+        $("<div class='page-metadata'>")
+    )
+
 
     function renderComponent(page: Page) {
-
+        
         return $(`<div class="card shadow-sm rounded-0 w-100 mb-1" aria-hidden="true">`)
             .css(customizePage && customizePage.route == page.route ? {
                 'background-color': '#f8f9fa',
@@ -115,12 +154,14 @@ export const Register = (editor: Editor, opts: {
                                 customizePage && customizePage.route == page.route
                                     ? $(`<button type="button" class="btn btn-sm text-primary border-primary rounded-0 border py-0 m-1"><i class="fa-regular fa-pen-to-square"></i></button>`)
                                         .on('click', () => startEdit(page))
-                                    : (
-                                        !page.name
+                                    : "",
+                                page.id
+                                    ? $(
+                                        page.removable
                                             ? $(`<button type="button" class="btn btn-sm text-danger border-danger rounded-0 border py-0 m-1"><i class="fa-regular fa-trash-can"></i></button>`)
-                                                .on('click', () => deletePage(page))
-                                            : ""
-                                    )
+                                            : $(`<button type="button" class="btn btn-sm text-warning border-warning rounded-0 border py-0 m-1"><i class="fa-solid fa-eraser"></i></button>`)
+                                    ).on('click', () => page.removable ? deletePage(page) : cleanPage(page))
+                                    : ""
                             )
 
                     )
@@ -132,7 +173,8 @@ export const Register = (editor: Editor, opts: {
 
 
     function render() {
-        const pages = opts.pages || [];
+
+        const pages = __.Website.Pages.data || [];
         if (opts.appendTo) {
             const container = $(opts.appendTo);
 
@@ -190,36 +232,29 @@ export const Register = (editor: Editor, opts: {
     }
 
 
-    if (!customizePage) {
-        const storageCustomizePage = window.localStorage.getItem('customize-page');
-        if (storageCustomizePage) {
-            const spage = JSON.parse(storageCustomizePage);
-            let find = opts.pages?.find(page => {
-                let id = spage.id || null;
-                let route = spage.route || null;
-                if (id) {
-                    return id == page.id;
-                } else if (route) {
-                    return route == page.route;
-                }
-            });
-
-            if (find) customize(find);
-            else {
-                let find = opts.pages?.find(page => page.name.toLowerCase() == "index");
-                if (find) customize(find);
-            }
-        } else {
-            let find = opts.pages?.find(page => page.name.toLowerCase() == "index");
-            if (find) customize(find);
-        }
+    function customize(page: Page) {
+        __.Editor.callbackHandler = savePage;
+        editor.runCommand("pages:customize", page);
     }
-    render();
 
-    $(".editor-canvas-wrapper").append(
-        $("<div class='page-metadata'>")
-    )
 
+    function cleanPage(page: Page) {
+
+        const index: number = opts.pages?.findIndex(p => p.id == page.id) as any;
+        if (!(typeof index == "undefined") && index < 0) return;
+
+        __.dialog.warning("Are you sure?", "Are you sure to reset customization page <b>" + page.title + '</b>')
+            .then(() => {
+                __.Website.Pages.fire("clear", page)
+                    .then(() => {
+                        __.toast('Page clear successful!', 5, 'text-success');
+                        render();
+                        customize(__.Website.Pages.data[index]);
+                    }).catch((err) => {
+                        __.toast(err.message || 'Failed clear page!', 5, 'text-danger');
+                    });
+            })
+    }
 
     function deletePage(page: Page) {
 
@@ -233,6 +268,9 @@ export const Register = (editor: Editor, opts: {
                         .then(() => {
                             __.toast('Page deleted', 5, 'text-success');
                             opts.pages?.splice(index, 1);
+                            if (page.name == customizePage?.name) {
+                                customize(__.Website.Pages.data[0]);
+                            }
                             render();
                         }).catch((err) => {
                             __.toast(err.message || 'Page not deleted', 5, 'text-danger');
@@ -243,23 +281,21 @@ export const Register = (editor: Editor, opts: {
             })
     }
 
-    function customize(page: Page) {
-        editor.runCommand("pages:customize", page);
-    }
 
 
 
     function addPage() {
 
         const page: Page = {
-            name: "",
+            name: Date.now().toString(16),
             title: "",
             description: "",
             route: "/" + Date.now().toString(16),
             components: [],
             styles: "",
             variables: [],
-            isChanged: true
+            isChanged: true,
+            removable: true
         };
         opts.pages?.push(page);
 
@@ -568,15 +604,16 @@ export const Register = (editor: Editor, opts: {
             flexDirection: "column",
         })
 
-        el.append(
-            $(`<div class="d-flex align-items-center mb-3 pt-2">`)
-                .append(
-                    $(`<button type="button" class="btn btn-sm text-primary border-primary rounded-0 border py-0 m-1">Go Back</button>`)
-                        .on('click', stopEdit),
-                    $(`<h5 class="ms-2 mb-0">Edit Page</h5>`),
+        function renderHeader() {
+            return $(`<div class="d-flex align-items-center mb-3 pt-2">`).append(
+                $(`<button type="button" class="btn btn-sm text-primary border-primary rounded-0 border py-0 m-1">Go Back</button>`)
+                    .on('click', stopEdit),
+                $(`<h5 class="ms-2 mb-0">Edit Page</h5>`),
 
-                )
-        )
+            )
+        }
+
+        el.append(renderHeader())
             .append(
                 $(`<div class="flex-grow-1 w-100 pb-5 scrollbar-none">`)
                     .css({
@@ -651,7 +688,7 @@ export const Register = (editor: Editor, opts: {
                             .append(
                                 $("<div class='form-group py-2'>")
                                     .append(
-                                        $("<h4>Metadata</h4>"),
+                                        $("<h4>Properties</h4>"),
 
                                         $("<div class='form-group mb-3'>")
                                             .css({
@@ -704,38 +741,28 @@ export const Register = (editor: Editor, opts: {
                                                             .on('click', () => testVariable())
                                                     )
                                             ),
-
-                                        $("<div class='form-group'>")
-                                            .css({
-                                                border: "1px solid #dee2e6",
-                                                padding: "0.5rem",
-                                            })
-                                            .append(
-                                                $("<label class='form-label w-100' for='meta-header'>Header</label>"),
-                                                $(`<div id='meta-header'></div>`)
-                                            )
                                     )
                             )
                     )
             )
 
-        renderVariables($("#variable"), page.variables || []);
+        // renderVariables($("#variable"), page.variables || []);
 
-        new EditorView({
-            doc: page.header || "",
-            extensions: [
-                basicSetup,
-                html(),
-                autocompletion(),
-                EditorView.updateListener.of((update) => {
-                    if (update.docChanged) {
-                        const content = update.state.doc.toString();
-                        page.header = content;
-                    }
-                })
-            ],
-            parent: el.find("#meta-header")[0]
-        });
+        // new EditorView({
+        //     doc: page.header || "",
+        //     extensions: [
+        //         basicSetup,
+        //         html(),
+        //         autocompletion(),
+        //         EditorView.updateListener.of((update) => {
+        //             if (update.docChanged) {
+        //                 const content = update.state.doc.toString();
+        //                 page.header = content;
+        //             }
+        //         })
+        //     ],
+        //     parent: el.find("#meta-header")[0]
+        // });
 
 
 
@@ -751,6 +778,20 @@ export const Register = (editor: Editor, opts: {
             position: "relative",
             display: "none",
         }).empty();
+    }
+
+    function savePage() {
+        if (customizePage) {
+            customizePage.components = JSON.stringify(editor.getComponents()) as any;
+            customizePage.styles = editor.getCss() as any;
+            customizePage.isChanged = false;
+        }
+        __.Website.Pages.handleSave(customizePage, (message: string) => {
+            this.resolve(message);
+            render();
+        }, (message: string) => {
+            this.reject(message)
+        });
     }
 
 

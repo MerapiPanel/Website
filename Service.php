@@ -14,4 +14,10 @@ class Service extends __Fragment
         $this->module = $module;
     }
 
+    function onInit()
+    {
+        // $this->module->data->get("page-properties.json")->listenOn("getContent", function (&$data) {
+        //     $data[] = "Hallo World";
+        // });
+    }
 }

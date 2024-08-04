@@ -1,0 +1,12 @@
+[
+    {
+        "label": "Meta OG Title",
+        "name": "og-title",
+        "type": "text"
+    },
+    {
+        "label": "Meta OG Description",
+        "name": "og-description",
+        "type": "text"
+    }
+]

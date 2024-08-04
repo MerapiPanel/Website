@@ -50,18 +50,22 @@ export const Register = (editor: Editor, opts: {
     });
 
 
-    __.website.pattern.listpops((patterns: any[]) => {
-        newBlocksEl = blockManager.render((patterns as any[]).map(pattern => {
-            pattern.content = {
-                type: "pattern",
-                components: [pattern.content],
-                attributes: {
-                    "pattern-name": pattern.name
+    __.Website.Pattern.listpops((patterns: any[]) => {
+        if (Array.isArray(patterns)) {
+            newBlocksEl = blockManager.render((patterns as any[]).map(pattern => {
+                pattern.content = {
+                    type: "pattern",
+                    components: [pattern.content],
+                    attributes: {
+                        "pattern-name": pattern.name
+                    }
                 }
-            }
-            return pattern;
-        }), { external: true });
-        render();
+                return pattern;
+            }), { external: true });
+            render();
+        } else {
+            __.toast("List pattern is must be array, " + typeof patterns + " was passed.")
+        }
     });
 
 

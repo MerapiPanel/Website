@@ -6,6 +6,7 @@
 	.pages-manager {
 		display: flex;
 	}
+
 	.patterns-manager .gjs-block {
 		width: 100%;
 	}
@@ -14,32 +15,32 @@
 
 {% block config %}
 {{ editor_config({
-	config: {
-		width: "100vw",
-		height: "100vh",
-		container: "#editor",
-		canvas: {
-			styles: [
-				"/vendor/bootstrap/css/bootstrap.min.css" | assets
-			],
-			scripts: [
-				"/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets
-			]
-		},
-		pluginsOpts: {
-			CodeEditor: {
-				editable: true
-			}
-		},
-		assetManager: {
-			custom: true,
-			assets: [],
-			upload: "/api/FileManager/upload" | access_path,
-			uploadName: "files",
-			fetch: "/api/FileManager/fetchFile?start=0&limit=10"|access_path
-		}
-	},
-	fetchBlockURL: "/editor/api/load" | access_path
+config: {
+width: "100vw",
+height: "100vh",
+container: "#editor",
+canvas: {
+styles: [
+"/vendor/bootstrap/css/bootstrap.min.css" | assets
+],
+scripts: [
+"/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets
+]
+},
+pluginsOpts: {
+CodeEditor: {
+editable: true
+}
+},
+assetManager: {
+custom: true,
+assets: [],
+upload: "/api/FileManager/upload" | access_path,
+uploadName: "files",
+fetch: "/api/FileManager/fetchFile?start=0&limit=10"|access_path
+}
+},
+fetchBlockURL: "/editor/api/load" | access_path
 }) }}
 {% endblock %}
 
@@ -48,67 +49,103 @@
 
 <script>
 
-	__.website = { pattern: {} };
-	__.website.pattern.listpops = function (callback) {
-		fetch("{{'/api/Website/Fragments/listpops'|access_path}}")
+	__.Website = {
+		Pattern: {},
+		Pages: {
+			o: {}
+		}
+	}
+	__.Website.Pattern.listpops = function (callback) {
+		fetch("{{'/api/Website/Patterns/listpops'|access_path}}")
 			.then(response => response.json())
 			.then(response => callback(response.data));
 	}
-	__.website.saveURL = "{{ '/api/Website/Pages/save' | access_path | url }}";
 
-	fetch("{{'/api/Website/Pages/fetchAll'|access_path}}")
-		.then(response => response.json())
-		.then(response => {
-			__.website.pages = response.data;
-		});
-	__.website.testVariable = function (data) {
+	__.Website.Pages.handle = (type, page) => {
 
-		const formData = new FormData();
+		return new Promise((accept, reject) => {
 
-		Object.keys(data).forEach(function (key) {
+			const handle = {
+				fetch: () => {
+					fetch("{{'/api/Website/Pages/fetchAll'|access_path}}")
+						.then(response => response.json())
+						.then(response => {
+							__.Website.Pages.data = response.data;
+							accept(response.data);
+						}).catch(err => reject(err.message || "Unknown error"))
+				},
+				remove: () => {
+					__.http.post("{{ '/api/Website/Pages/delete' | access_path }}", {
+						id: page.id
+					}).then(function (response) {
+						if (response.status) {
+							accept(response.data);
+						} else {
+							reject(response.message || "Error: Please try again!");
+						}
+					}).catch(error => {
+						reject(error);
+					});
+				},
+				clear: () => {
+					__.http.post("{{'/api/Website/Pages/delete'|access_path}}", {
+						id: page.id
+					}).then(function (response) {
+						if (response.status) {
+							fetch("{{'/api/Website/Pages/getpop'|access_path}}?name=" + page.name).then(e => e.json())
+								.then(e => {
+									if (e.status) {
+										accept();
+									}
+									else {
+										throw new Error(e.message || "Failed clear page")
+									}
+								})
+								.catch(reject);
+						} else {
+							reject(response.message || "Error: Please try again!");
+						}
+					}).catch(error => {
+						reject(error);
+					});
+				},
+				save: () => {
+					const formData = new FormData();
+					Object.keys(page).forEach((key) => {
+						const value = page[key];
+						if (typeof value == "object" && !Array.isArray(value)) {
+							formData.append(key, JSON.stringify(value));
+						} else if (Array.isArray(value)) {
+							for (let i = 0; i < value.length; i++) {
+								let item = value[i];
+								if (typeof item == "object" || Array.isArray(item)) {
+									Object.keys(item).forEach((k) => {
+										formData.append(`${key}[${i}][${k}]`, item[k]);
+									});
+								} else {
+									formData.append(`${key}[${i}]`, item);
+								}
+							}
+						} else {
+							formData.append(key, page[key]);
+						}
+					});
 
-			if (typeof data[key] == "object" || Array.isArray(data[key])) {
-				Object.keys(data[key]).forEach(function (k) {
-					if (typeof data[key][k] == "object" || Array.isArray(data[key][k])) {
-						Object.keys(data[key][k]).forEach(function (kk) {
-							formData.append(`${key}[${k}][${kk}]`, data[key][k][kk]);
-						});
-					} else {
-						formData.append(`${key}[${k}]`, data[key][k]);
-					}
-				})
-			} else {
-				formData.append(key, data[key]);
-			}
-		});
-		return new Promise(function (resolve, reject) {
-			__.http.post("{{ '/api/Website/Variable/test' | access_path }}", formData)
-				.then(function (response) {
-					if (response.code == 200) {
-						resolve(response.data);
-					} else {
-						reject(response.message || "Error: Please try again!");
-					}
-				})
-				.catch(error => {
-					reject(error);
-				});
-		});
-	}
-
-	__.website.deletePage = function (page) {
-		return new Promise(function (resolve, reject) {
-			__.http.post("{{ '/api/Website/Pages/delete' | access_path }}", {
-				id: page.id
-			}).then(function (response) {
-				if (response.code == 200) {
-					resolve(response.data);
-				} else {
-					reject(response.message || "Error: Please try again!");
+					__.http.post("{{'/api/Website/Pages/save'|access_path|url}}", formData)
+						.then((result) => {
+							if (result.status) {
+								accept("Action success full", 5, 'text-success');
+							} else {
+								reject(result.message || "Failed to save page");
+							}
+						}).catch(err => reject(err.message || "Failed save page!"))
 				}
-			}).catch(error => {
-				reject(error);
-			});
+			}
+
+			if (!Object.keys(handle).includes(type)) {
+				reject("Unknown type handle {"+type+"}");
+			}
+			handle[type]();
 		})
 	}
 </script>

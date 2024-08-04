@@ -5,7 +5,7 @@ namespace MerapiPanel\Module\Website {
     use MerapiPanel\Box\Module\__Fragment;
     use MerapiPanel\Box\Module\Entity\Module;
 
-    class Fragments extends __Fragment
+    class Patterns extends __Fragment
     {
         protected $module;
         function onCreate(Module $module)
@@ -16,7 +16,7 @@ namespace MerapiPanel\Module\Website {
         function listpops()
         {
             $data = [];
-            foreach (glob(__DIR__ . "/data/fragments/*.json") as $file) {
+            foreach (glob(__DIR__ . "/data/patterns/*.json") as $file) {
                 $name = basename($file, ".json");
                 $content = json_decode(file_get_contents($file) ?? "{}", 1);
                 $data[] = [
