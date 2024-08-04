@@ -28,7 +28,8 @@ export const useItemContext = () => useContext(ItemContext);
 const Item = ({ page }: { page: TPage }) => {
 
     const [active, setActive] = useState<boolean>(false);
-    const { current } = usePageContext();
+    const { current, pages } = usePageContext();
+    const [isChanged, setChanged] = useState<boolean>(false);
     const value: TItemContext = {
         active,
         setActive
@@ -39,12 +40,21 @@ const Item = ({ page }: { page: TPage }) => {
         if (page.name == current?.name) {
             setActive(true);
         }
+        setTimeout(() => {
+            setChanged(page.isChanged == true);
+        }, 400)
     }, [current]);
+
+    useEffect(() => {
+        setTimeout(() => {
+            setChanged(page.isChanged == true);
+        }, 600)
+    }, [pages]);
 
     return (
         <ItemContext.Provider value={value}>
             <div
-                className="card shadow-sm rounded-0 w-100 mb-1"
+                className="card shadow-sm rounded-0 w-100 mb-1 position-relative"
                 aria-hidden="true"
                 style={{
                     border: "2px dashed #00000005",
@@ -61,6 +71,7 @@ const Item = ({ page }: { page: TPage }) => {
                     <Description>{page.description}</Description>
                     <RouteLabel>{page.route}</RouteLabel>
                     <Actions page={page} />
+                    {isChanged == true && (<span className="badge bg-warning position-absolute top-0 end-0 m-1">Changed</span>)}
                 </div>
             </div>
         </ItemContext.Provider>

@@ -439,7 +439,7 @@ export const Register = (editor: Editor, opts: {
                 if (!params.includes(param)) {
                     delete __params[param];
                 }
-            })
+            });
 
             const content = $("<div>")
                 .append(

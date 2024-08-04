@@ -95,7 +95,7 @@ fetchBlockURL: "/editor/api/load" | access_path
 							fetch("{{'/api/Website/Pages/getpop'|access_path}}?name=" + page.name).then(e => e.json())
 								.then(e => {
 									if (e.status) {
-										accept();
+										accept(e.data);
 									}
 									else {
 										throw new Error(e.message || "Failed clear page")
@@ -133,8 +133,8 @@ fetchBlockURL: "/editor/api/load" | access_path
 
 					__.http.post("{{'/api/Website/Pages/save'|access_path|url}}", formData)
 						.then((result) => {
-							if (result.status) {
-								accept("Action success full", 5, 'text-success');
+							if (result.data.id) {
+								accept(result.data);
 							} else {
 								reject(result.message || "Failed to save page");
 							}
@@ -143,7 +143,7 @@ fetchBlockURL: "/editor/api/load" | access_path
 			}
 
 			if (!Object.keys(handle).includes(type)) {
-				reject("Unknown type handle {"+type+"}");
+				reject("Unknown type handle {" + type + "}");
 			}
 			handle[type]();
 		})

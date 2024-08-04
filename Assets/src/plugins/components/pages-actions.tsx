@@ -22,7 +22,7 @@ export const ActionCustomize = ({ page }: { page: TPage }) => {
 
     const { active } = useItemContext();
     const [enable, setEnable] = useState(true);
-    const { setCurrent } = usePageContext();
+    const { startCustomize } = usePageContext();
     const btn = useRef(null);
 
     useEffect(() => {
@@ -39,7 +39,7 @@ export const ActionCustomize = ({ page }: { page: TPage }) => {
     }, [active]);
 
     function handleClick() {
-        setCurrent(page);
+        startCustomize(page);
     }
 
     return (
@@ -52,22 +52,22 @@ export const ActionCustomize = ({ page }: { page: TPage }) => {
 
 export const ActionEdit = ({ page }: { page: TPage }) => {
 
-    const { current, editing, setEditing } = usePageContext();
+    const { isEditLayerOpen, setIsEditLayerOpen } = usePageContext();
     const btnRef = useRef(null);
 
     useEffect(() => {
         if (btnRef.current) {
             const btn = btnRef.current;
-            if (editing) {
+            if (isEditLayerOpen) {
                 $(btn).removeClass("text-primary border-primary").addClass("text-muted border-muted");
             } else {
                 $(btn).addClass("text-primary border-primary").removeClass("text-muted border-muted");
             }
         }
-    }, [editing]);
+    }, [isEditLayerOpen]);
 
     function handleClick() {
-        setEditing(editing ? null : current);
+        setIsEditLayerOpen(!isEditLayerOpen);
     }
     return (
         <button ref={btnRef} type="button" className="btn btn-sm text-primary border-primary rounded-0 border py-0 m-1" onClick={handleClick}>
@@ -80,7 +80,7 @@ export const ActionEdit = ({ page }: { page: TPage }) => {
 
 export const ActionReset = ({ page }: { page: TPage }) => {
 
-    const { __, setReload } = usePageContext();
+    const { __, resetCallback } = usePageContext();
 
     function clickHandle() {
 
@@ -89,7 +89,7 @@ export const ActionReset = ({ page }: { page: TPage }) => {
                 __.Website.Pages.handle("clear", page)
                     .then(() => {
                         __.toast('Page clear successful!', 5, 'text-success');
-                        setReload(true);
+                        resetCallback();
                     }).catch((err) => {
                         __.toast(err || 'Failed clear page!', 5, 'text-danger');
                     });
@@ -107,13 +107,14 @@ export const ActionReset = ({ page }: { page: TPage }) => {
 
 export const ActionRemove = ({ page }: { page: TPage }) => {
 
-    const { __, setReload, setCurrent } = usePageContext();
+    const { __, setReload, setIsEditLayerOpen } = usePageContext();
 
     function handleClick() {
         __.dialog.danger("Are you sure?", "Are you sure to delete this page <b>" + page.title + '</b> with id <i>' + page.id + '</i>')
             .then(() => {
                 __.Website.Pages.handle("remove", page)
                     .then(() => {
+                        setIsEditLayerOpen(false);
                         __.toast('Page removed successful', 5, 'text-success');
                         setReload(true);
                     }).catch((err) => {

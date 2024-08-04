@@ -1,46 +1,38 @@
-import React from "react";
-import { TPageProp, TypeList } from "../../Pages2";
+import React, { createContext, useCallback, useEffect, useState } from "react";
+import { TPageProp, usePageContext } from "../../Pages2";
+import Row from "./props/row";
+import { debounce } from "lodash";
+import { useFormContext } from "../pages-form";
 
-
-const ColValue = ({ value, type }: { value: string, type: TypeList }) => {
-
-    return (
-        <>
-            {type == TypeList.text && (
-                <input className="form-control" value={value} />
-            )}
-            {type == TypeList.logtext && (
-                <textarea className="form-control" rows={3} value={value}></textarea>
-            )}
-            {type == TypeList.color && (
-                <input type="color" className="form-control" value={value} />
-            )}
-            {type == TypeList.color && (
-                <img className="w-100" src={value} />
-            )}
-            {!Object.values(TypeList).includes(type) && (
-                <>Unknown Type <code>{type}</code></>
-            )}
-        </>
-    )
+type TFormPropsContext = {
+    props: TPageProp[],
+    setProps: React.Dispatch<React.SetStateAction<TPageProp[]>>
 }
+export const FormPropsContext = createContext<TFormPropsContext>({} as any);
+const FormProps = () => {
+    const { _properties, setProperties } = useFormContext();
+    const [props, setProps] = useState<TPageProp[] | []>([]);
 
-const ItemRow = ({ prop }: { prop: TPageProp }) => {
+    const debouncedSetValue = useCallback(
+        debounce((props: TPageProp[] | []) => {
+            setProperties(props);
+        }, 50), // Adjust debounce delay as needed
+        [props] // Include setEditing in dependency array if it's a stable reference
+    );
+
+    useEffect(() => {
+        debouncedSetValue(props);
+    }, [props]);
+
+    useEffect(() => {
+        setProps(_properties || []);
+    }, [_properties]);
 
     return (
-        <tr className="border-0">
-            <td className="border-0">{prop.label}</td>
-            <td className="border-0">
-                <ColValue value={prop.value} type={prop.type} />
-            </td>
-        </tr>
-    )
-}
-
-const FormProps = ({ properties }: { properties: TPageProp[] }) => {
-
-    return (
-        <>
+        <FormPropsContext.Provider value={{
+            props,
+            setProps
+        }}>
             <div className='form-group mb-3'>
                 <label className='form-label w-100'>PROPERTIES</label>
                 <table className="table">
@@ -56,11 +48,11 @@ const FormProps = ({ properties }: { properties: TPageProp[] }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {properties.map((prop, i) => <ItemRow key={i} prop={prop} />)}
+                        {props.map((prop, i) => <Row key={i} prop={prop} />)}
                     </tbody>
                 </table>
             </div>
-        </>
+        </FormPropsContext.Provider>
     )
 }
 

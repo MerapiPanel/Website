@@ -2,11 +2,18 @@
     {
         "label": "Meta OG Title",
         "name": "og-title",
-        "type": "text"
+        "type": "text",
+        "value": "Welcome To Merapi Panel"
     },
     {
         "label": "Meta OG Description",
         "name": "og-description",
-        "type": "text"
+        "type": "logtext",
+        "value": "Merapi Panel is an powerful cms sistem design modular envirenment"
+    },
+    {
+        "label": "Meta Og Image",
+        "type": "asset",
+        "name": "og-image"
     }
 ]

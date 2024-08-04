@@ -47,7 +47,7 @@ class Pages extends __Fragment
             }
         }
 
-        $SQL = "SELECT A.*, B.variables, B.header FROM pages A LEFT JOIN pages_metadata B ON A.id = B.page_id ORDER BY A.`post_date` DESC";
+        $SQL = "SELECT * FROM pages ORDER BY `post_date` DESC";
         $pages = DB::instance()->query($SQL)->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($fixed_data as $page) {
@@ -71,7 +71,17 @@ class Pages extends __Fragment
             if (!isset($page['removable'])) {
                 $page['removable'] = true;
             }
-            $page['properties'] = $this->module->data->get("page-properties.json")->getContent();
+
+            if (isset($page['properties']) && is_string($page['properties'])) {
+                $page['properties'] = json_decode($page['properties'], true);
+            }
+            foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
+                if (!isset($prop['name'])) continue;
+                if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
+                    if (!isset($page['properties'])) $page['properties'] = [];
+                    $page['properties'][] = $prop;
+                }
+            }
         }
 
         $this->loged_pages = $pages;
@@ -93,7 +103,16 @@ class Pages extends __Fragment
             if (isset($page['components'])) {
                 $page['components'] = json_decode($page['components'], true);
             }
-            $page['properties'] = $this->module->data->get("page-properties.json")->getContent();
+            if (isset($page['properties']) && is_string($page['properties'])) {
+                $page['properties'] = json_decode($page['properties'], true);
+            }
+            foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
+                if (!isset($prop['name'])) continue;
+                if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
+                    if (!isset($page['properties'])) $page['properties'] = [];
+                    $page['properties'][] = $prop;
+                }
+            }
             return $page;
         } else {
 
@@ -105,7 +124,19 @@ class Pages extends __Fragment
                 if (isset($page['components'])) {
                     $page['components'] = json_decode($page['components'], true);
                 }
-                $page['properties'] = $this->module->data->get("page-properties.json")->getContent();
+                if (isset($page['properties']) && is_string($page['properties'])) {
+                    $page['properties'] = json_decode($page['properties'], true);
+                }
+                if (isset($page['properties']) && is_string($page['properties'])) {
+                    $page['properties'] = json_decode($page['properties'], true);
+                }
+                foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
+                    if (!isset($prop['name'])) continue;
+                    if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
+                        if (!isset($page['properties'])) $page['properties'] = [];
+                        $page['properties'][] = $prop;
+                    }
+                }
                 return $page;
             }
             $listpops = $this->listpops();
@@ -142,15 +173,24 @@ class Pages extends __Fragment
 
 
 
-    function add($name, $title, $description, $route, $components = [], $styles = "")
+    function add($name, $title, $description, $route, $components = [], $styles = "", $properties = [])
     {
         if (!$this->module->getRoles()->isAllowed(0)) {
             throw new Exception("Access denied");
         }
 
-        $SQL = "INSERT INTO pages (name, title, description, route, components, styles) VALUES (?, ?, ?, ?, ?, ?)";
+        $SQL = "INSERT INTO pages (name, title, description, route, components, styles, properties) VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = DB::instance()->prepare($SQL);
-        if ($stmt->execute([$name, $title, $description, $route, (is_string($components) ? $components : json_encode($components)), $styles])) {
+        if ($stmt->execute([
+            $name,
+            $title,
+            $description,
+            $route,
+            (is_string($components) ? $components : json_encode($components)),
+            $styles,
+            (is_string($properties) ? $properties : json_encode($properties))
+        ])) {
+
             return [
                 "id"    => DB::instance()->lastInsertId(),
                 "title" => $title,
@@ -158,6 +198,7 @@ class Pages extends __Fragment
                 "description" => $description,
                 "route"      => $route,
                 "components" => $components,
+                "properties" => $properties,
                 "styles"     => $styles
             ];
         }
@@ -165,37 +206,28 @@ class Pages extends __Fragment
     }
 
 
-    function save($id, $name, $title, $route, $description, $components = [], $styles = "", $variables = "", $header = "")
+    function save($id, $name, $title, $route, $description, $components = [], $styles = "", $properties = [])
     {
         if (!$this->module->getRoles()->isAllowed(0)) {
             throw new Exception("Access denied");
         }
 
         if (empty($id)) {
-            return $this->add($name, $title, $description, $route, $components, $styles);
+            return $this->add($name, $title, $description, $route, $components, $styles, $properties);
         }
 
-        $SQL = "REPLACE INTO pages (id, name, title, description, route, components, styles) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $SQL = "REPLACE INTO pages (id, name, title, description, route, components, styles, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = DB::instance()->prepare($SQL);
-        if ($stmt->execute([$id, $name, $title, $description, $route, (is_string($components) ? $components : json_encode($components)), $styles])) {
-
-            if (!empty($variables) || !empty($header)) {
-                $SQL = "REPLACE INTO pages_metadata (page_id, variables, header) VALUES (?, ?, ?)";
-                $stmt = DB::instance()->prepare($SQL);
-                if (empty($header) || $header == null || $header == "null") {
-                    $header = "";
-                }
-                if (empty($variables) || $variables == null || $variables == "null") {
-                    $variables = "[]";
-                }
-                $header = is_string($header) ? $header : json_encode($header);
-                $variables = is_string($variables) ? $variables : json_encode($variables);
-                $stmt->execute([$id, $variables, $header]);
-            } else if (empty(trim($variables)) && empty(trim($header))) {
-                $SQL = "DELETE FROM pages_metadata WHERE page_id = ?";
-                $stmt = DB::instance()->prepare($SQL);
-                $stmt->execute([$id]);
-            }
+        if ($stmt->execute([
+            $id,
+            $name,
+            $title,
+            $description,
+            $route,
+            (is_string($components) ? $components : json_encode($components)),
+            $styles,
+            (is_string($properties) ? $properties : json_encode($properties))
+        ])) {
 
             return [
                 "id"     => $id,
@@ -204,6 +236,7 @@ class Pages extends __Fragment
                 "description" => $description,
                 "route"      => $route,
                 "components" => $components,
+                "properties" => $properties,
                 "styles"     => $styles
             ];
         }
