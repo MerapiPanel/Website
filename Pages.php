@@ -5,7 +5,11 @@ namespace MerapiPanel\Module\Website;
 use Exception;
 use MerapiPanel\Box;
 use MerapiPanel\Box\Module\__Fragment;
+use MerapiPanel\Box\Module\Entity\Module;
 use MerapiPanel\Database\DB;
+use MerapiPanel\Utility\Http\Request;
+use MerapiPanel\Utility\Util;
+use MerapiPanel\Views\View;
 use PDO;
 use Symfony\Component\Filesystem\Path;
 use Throwable;
@@ -14,10 +18,163 @@ class Pages extends __Fragment
 {
 
     protected $module;
-    function onCreate(\MerapiPanel\Box\Module\Entity\Module $module)
+    function onCreate(Module $module)
     {
         $this->module = $module;
     }
+
+
+
+    function renderProperties($properties)
+    {
+
+        $output = [];
+        foreach ($properties as $property) {
+
+            $value = $property['value'] ?? $property["default"] ?? "";
+
+            if ($property['name'] == "meta-title") {
+                $output[] = "<title>{$value}</title><meta name=\"title\" content=\"{$value}\" /><meta property=\"og:title\" content=\"{$value}\" />";
+            } else if ($property['name'] == "meta-description") {
+                $output[] = "<meta name=\"description\" content=\"{$value}\" /><meta property=\"og:description\" content=\"{$value}\" />";
+            } else if ($property['name'] == "meta-image") {
+                $image = Util::siteURL($value ?? "");
+                $output[] = "<meta property=\"og:image\" content=\"{$image}\" />";
+            } else if ($property['name'] == "with-twitter-card") {
+                $output[] = $this->generateTwitterCard($property, $properties);
+            } else {
+                $output[] = $property;
+            }
+        }
+
+        return $output;
+    }
+
+    private function generateTwitterCard($property, $properties)
+    {
+
+        $ptitle = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-title"))[0] ?? false;
+        $pdesct = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-description"))[0] ?? false;
+        $pimage = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-image"))[0] ?? false;
+
+        $title = $ptitle['value'] ?? $ptitle['default'] ?? "";
+        $desct = $pdesct['value'] ?? $pdesct['default'] ?? "";
+        $image = Util::siteURL($pimage['value'] ?? $pimage['default'] ?? "");
+        $site_url = Request::getInstance()->getURI();
+
+        return View::minimizeHTML(<<<HTML
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="{$site_url}" />
+        <meta property="twitter:title" content="{$title}" />
+        <meta property="twitter:description" content="{$desct}" />
+        <meta property="twitter:image" content="{$image}" />
+        HTML);
+    }
+
+
+    private array $cached_defined_properties = [];
+    private function getDefinePageProperties()
+    {
+
+        if (!empty($this->cached_defined_properties)) return $this->cached_defined_properties;
+        $properties = $this->module->data->get("page-properties.json")->getContent();
+        if (is_array($properties)) {
+
+            // Filter duplicates based on 'name'
+            $finalProperties = [];
+            $names = [];
+            foreach ($properties as $property) {
+                if (isset($property['name']) && !in_array($property['name'], $names)) {
+                    $names[] = $property['name'];
+                    $finalProperties[] = $property;
+                }
+            }
+            $this->cached_defined_properties = $finalProperties;
+        }
+        return $this->cached_defined_properties;
+    }
+
+
+    private function filterProperty($properties = [])
+    {
+        return array_values(array_filter(array_map(function ($prop) {
+
+            if (!isset($prop['name'], $prop['value'], $prop['type']) || empty($prop['name']) || empty($prop['value']) || empty($prop['type'])) return;
+
+            $newprop = [
+                "name" => $prop['name'],
+                "value" => $prop['value'],
+                "type" => $prop['type']
+            ];
+
+            if (isset($prop['selected-type'])) {
+                $newprop['selectedType'] = $prop['selected-type'];
+            } else if (isset($prop['selectedType'])) {
+                $newprop['selected-type'] = $prop['selectedType'];
+            }
+
+            return $newprop;
+        }, $properties)));
+    }
+
+
+    public function sync_properties($properties): array
+    {
+        // Decode JSON if needed and ensure it's an array
+        $properties = !is_array($properties) ? json_decode($properties, true) : $properties;
+
+        // If properties are empty, return default page properties
+        if (empty($properties)) return $this->getDefinePageProperties();
+
+        // Get defined page properties
+        $definedProperties = $this->getDefinePageProperties();
+        $mergedProperties = [];
+
+        // Create a map for quick lookup of properties by name
+        $propertiesMap = [];
+        foreach ($properties as $property) {
+            if (isset($property['name'])) {
+                $propertiesMap[$property['name']] = $property;
+            }
+        }
+
+        // Merge properties with defined properties
+        foreach ($definedProperties as $prop) {
+            if (!isset($prop['name'])) continue;
+
+            if (isset($propertiesMap[$prop['name']])) {
+                // Merge properties, prioritizing defined properties and default type
+                $mergedProperties[] = array_merge(
+                    $propertiesMap[$prop['name']],
+                    $prop,
+                    ['type' => $prop['type'] ?? 'text']
+                );
+            } else {
+                // Add defined property if not found in properties
+                $mergedProperties[] = $prop;
+            }
+        }
+
+        // Add any remaining properties that were not defined
+        foreach ($properties as $property) {
+            if (isset($property['name']) && !isset($propertiesMap[$property['name']])) {
+                $mergedProperties[] = $property;
+            }
+        }
+
+        // Filter duplicates based on 'name'
+        $finalProperties = [];
+        $names = [];
+        foreach ($mergedProperties as $property) {
+            if (isset($property['name']) && !in_array($property['name'], $names)) {
+                $names[] = $property['name'];
+                $finalProperties[] = $property;
+            }
+        }
+
+        return $finalProperties;
+    }
+
 
 
     private $loged_pages = [];
@@ -61,28 +218,15 @@ class Pages extends __Fragment
                 $pages[] = $page;
             }
         }
-        foreach ($pages as &$page) {
-            if (isset($page['components']) && is_string($page['components'])) {
-                $page['components'] = json_decode($page['components'], true);
-            }
-            if (isset($page['variables']) && is_string($page['variables'])) {
-                $page['variables'] = json_decode($page['variables'], true);
-            }
-            if (!isset($page['removable'])) {
-                $page['removable'] = true;
-            }
 
-            if (isset($page['properties']) && is_string($page['properties'])) {
-                $page['properties'] = json_decode($page['properties'], true);
-            }
-            foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
-                if (!isset($prop['name'])) continue;
-                if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
-                    if (!isset($page['properties'])) $page['properties'] = [];
-                    $page['properties'][] = $prop;
-                }
-            }
-        }
+        $pages = array_map(function ($page) {
+
+            if (isset($page['components']) && is_string($page['components'])) $page['components'] = json_decode($page['components'], true);
+            if (isset($page['variables']) && is_string($page['variables'])) $page['variables'] = json_decode($page['variables'], true);
+            if (!isset($page['removable'])) $page['removable'] = true;
+            $page['properties'] = $this->sync_properties($page["properties"] ?? []);
+            return $page;
+        }, $pages);
 
         $this->loged_pages = $pages;
         return $this->loged_pages;
@@ -103,16 +247,7 @@ class Pages extends __Fragment
             if (isset($page['components'])) {
                 $page['components'] = json_decode($page['components'], true);
             }
-            if (isset($page['properties']) && is_string($page['properties'])) {
-                $page['properties'] = json_decode($page['properties'], true);
-            }
-            foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
-                if (!isset($prop['name'])) continue;
-                if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
-                    if (!isset($page['properties'])) $page['properties'] = [];
-                    $page['properties'][] = $prop;
-                }
-            }
+            $page['properties'] = $this->sync_properties($page["properties"]);
             return $page;
         } else {
 
@@ -124,19 +259,7 @@ class Pages extends __Fragment
                 if (isset($page['components'])) {
                     $page['components'] = json_decode($page['components'], true);
                 }
-                if (isset($page['properties']) && is_string($page['properties'])) {
-                    $page['properties'] = json_decode($page['properties'], true);
-                }
-                if (isset($page['properties']) && is_string($page['properties'])) {
-                    $page['properties'] = json_decode($page['properties'], true);
-                }
-                foreach ($this->module->data->get("page-properties.json")->getContent() as $prop) {
-                    if (!isset($prop['name'])) continue;
-                    if (!in_array($prop['name'], array_column($page['properties'] ?? [], "name"))) {
-                        if (!isset($page['properties'])) $page['properties'] = [];
-                        $page['properties'][] = $prop;
-                    }
-                }
+                $page['properties'] = $this->sync_properties($page["properties"]);
                 return $page;
             }
             $listpops = $this->listpops();
@@ -153,7 +276,6 @@ class Pages extends __Fragment
      */
     function fetchAll()
     {
-
         return $this->listpops();
     }
 
@@ -179,6 +301,12 @@ class Pages extends __Fragment
             throw new Exception("Access denied");
         }
 
+        $components_array = !is_array($components) ? json_decode($components, 1) : $components;
+        $properties_array = !is_array($properties) ?  json_decode($properties, 1) : $properties;
+        $components_string = is_string($components) ? $components : json_encode($components);
+        $properties_string = json_encode($this->filterProperty($properties_array));
+
+
         $SQL = "INSERT INTO pages (name, title, description, route, components, styles, properties) VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = DB::instance()->prepare($SQL);
         if ($stmt->execute([
@@ -186,9 +314,9 @@ class Pages extends __Fragment
             $title,
             $description,
             $route,
-            (is_string($components) ? $components : json_encode($components)),
+            $components_string,
             $styles,
-            (is_string($properties) ? $properties : json_encode($properties))
+            $properties_string
         ])) {
 
             return [
@@ -197,8 +325,8 @@ class Pages extends __Fragment
                 "name"  => $name,
                 "description" => $description,
                 "route"      => $route,
-                "components" => $components,
-                "properties" => $properties,
+                "components" => $components_array,
+                "properties" => $properties_array,
                 "styles"     => $styles
             ];
         }
@@ -208,15 +336,21 @@ class Pages extends __Fragment
 
     function save($id, $name, $title, $route, $description, $components = [], $styles = "", $properties = [])
     {
+
         if (!$this->module->getRoles()->isAllowed(0)) {
             throw new Exception("Access denied");
         }
-
         if (empty($id)) {
             return $this->add($name, $title, $description, $route, $components, $styles, $properties);
         }
 
-        $SQL = "REPLACE INTO pages (id, name, title, description, route, components, styles, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $components_array  = !is_array($components) ? json_decode($components, 1) : $components;
+        $properties_array  = !is_array($properties) ?  json_decode($properties, 1) : $properties;
+        $components_string = is_string($components) ? $components : json_encode($components);
+        $properties_string = json_encode($this->filterProperty($properties_array));
+
+
+        $SQL = "REPLACE INTO pages (`id`, `name`, `title`, `description`, `route`, `components`, `styles`, `properties`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = DB::instance()->prepare($SQL);
         if ($stmt->execute([
             $id,
@@ -224,9 +358,9 @@ class Pages extends __Fragment
             $title,
             $description,
             $route,
-            (is_string($components) ? $components : json_encode($components)),
+            $components_string,
             $styles,
-            (is_string($properties) ? $properties : json_encode($properties))
+            $properties_string
         ])) {
 
             return [
@@ -235,8 +369,8 @@ class Pages extends __Fragment
                 "title"  => $title,
                 "description" => $description,
                 "route"      => $route,
-                "components" => $components,
-                "properties" => $properties,
+                "components" => $components_array,
+                "properties" => $properties_array,
                 "styles"     => $styles
             ];
         }

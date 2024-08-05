@@ -4,7 +4,7 @@ import { TPage, usePageContext } from "../Pages2";
 
 const Header = () => {
 
-    const { setCurrent, __, setReload } = usePageContext();
+    const { setCurrent, __, setReload, addCallback } = usePageContext();
 
     function handleAdd() {
 
@@ -25,12 +25,9 @@ const Header = () => {
             clone[key] = typeof val == "string" ? val : JSON.stringify(val);
         });
         __.Website.Pages.handle("save", clone)
-            .then(() => {
+            .then((e) => {
                 __.toast("New page added successful!", 5, 'text-success')
-                setReload(true);
-                setTimeout(() => {
-                    setCurrent(newpage);
-                }, 200);
+                addCallback(e);
             }).catch((err: string) => {
                 __.toast(err || "Failed add page!", 5, 'text-danger')
             });

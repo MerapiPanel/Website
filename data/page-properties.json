@@ -1,19 +1,26 @@
 [
     {
-        "label": "Meta OG Title",
-        "name": "og-title",
+        "label": "Meta Title",
+        "name": "meta-title",
         "type": "text",
-        "value": "Welcome To Merapi Panel"
+        "default": "Welcome To Merapi Panel"
     },
     {
-        "label": "Meta OG Description",
-        "name": "og-description",
+        "label": "Meta Description",
+        "name": "meta-description",
         "type": "logtext",
-        "value": "Merapi Panel is an powerful cms sistem design modular envirenment"
+        "default": "Merapi Panel is an powerful cms sistem design modular envirenment"
     },
     {
-        "label": "Meta Og Image",
-        "type": "asset",
-        "name": "og-image"
+        "label": "Meta Image",
+        "type": "image|text",
+        "selected-type": "text",
+        "name": "meta-image"
+    },
+    {
+        "label": "Generate Twitter Card",
+        "type": "check",
+        "name": "with-twitter-card",
+        "default": true
     }
 ]

@@ -517,5 +517,11 @@ editor.onReady = function (editor: Editor) {
     initPatternsManager(editor);
     initPagesManager(editor);
     loadGlobalAssets(editor);
+
+    const doc = editor.Canvas.getDocument();
+    const style = doc.createElement("style");
+    style.innerHTML = "[data-gjs-type=\"wrapper\"] { padding-bottom: 2rem; }";
+    doc.head.appendChild(style);
+    editor.Canvas.refresh();
 }
 

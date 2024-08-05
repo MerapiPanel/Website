@@ -107,16 +107,15 @@ export const ActionReset = ({ page }: { page: TPage }) => {
 
 export const ActionRemove = ({ page }: { page: TPage }) => {
 
-    const { __, setReload, setIsEditLayerOpen } = usePageContext();
+    const { __, removeCallback } = usePageContext();
 
     function handleClick() {
         __.dialog.danger("Are you sure?", "Are you sure to delete this page <b>" + page.title + '</b> with id <i>' + page.id + '</i>')
             .then(() => {
                 __.Website.Pages.handle("remove", page)
                     .then(() => {
-                        setIsEditLayerOpen(false);
                         __.toast('Page removed successful', 5, 'text-success');
-                        setReload(true);
+                        removeCallback();
                     }).catch((err) => {
                         __.toast(err || 'Failed remove page', 5, 'text-danger');
                     });

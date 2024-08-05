@@ -33,24 +33,25 @@ class Guest extends __Fragment
 
                 $components = $page['components'] ?? [];
                 $styles     = $page['styles'] ?? "";
-                $header     = $page['header'] ?? "";
-                $variables  = $page['variables'] ?? "";
+                $properties = $this->module->Pages->renderProperties(is_array($page['properties']) ? $page['properties'] : json_decode($page['properties']));
                 $content    = $BlocksEditor->render($components);
                 self::cleanTwigFragmentFromHtml($content);
                 $lang = View::getInstance()->getIntl()->getLocale();
                 $styles .= $BlocksEditor->getStyles();
 
                 $global_scripts = $this->renderGlobalAsset("script");
-                $global_styles = $this->renderGlobalAsset("style");
-                $global_links = $this->renderGlobalAsset("link");
+                $global_styles  = $this->renderGlobalAsset("style");
+                $global_links   = $this->renderGlobalAsset("link");
+
+                $properties_string = implode(" ", array_filter($properties, fn ($v) => gettype($v) == "string"));
 
                 $html = <<<HTML
                 <!DOCTYPE html>
                 <html lang="{$lang}">
                     <head>
                         {% block header %}
-                        {$header}
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        {$properties_string}
                         {% block stylesheet %}
                         <link rel="stylesheet" href="{{ '/dist/main.css' | assets }}">
                         <link rel="stylesheet" href="{{ '/vendor/fontawesome/css/all.min.css' | assets }}">
@@ -72,16 +73,7 @@ class Guest extends __Fragment
                 HTML;
                 $twig = View::getInstance()->getTwig();
                 $template = $twig->createTemplate($html, "template");
-                $_variables = [];
-                try {
-
-                    $variables = is_string($variables) ? json_decode($variables ?? '[]', true) : $variables;
-                    if (is_array($variables) && count($variables) > 0) {
-                        $_variables = Box::module("Website")->Variable->execute($variables);
-                    }
-                } catch (\Throwable $th) {
-                    $_variables = [];
-                }
+    
                 $_variables["_page"] = $page;
                 $_variables["_request"] = Request::getInstance();
                 $_variables["_lang"] = $lang;

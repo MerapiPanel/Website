@@ -5,8 +5,9 @@ import Container from "./components/pages-container";
 import Header from "./components/pages-header";
 import { __MP } from "../../../../../Buildin/src/main";
 import FormContainer from "./components/pages-form";
-import { debounce } from "lodash";
+import { debounce, isEmpty } from "lodash";
 import _ from "underscore";
+import { convertKeysToCamelCase } from "../partials/converter";
 
 const __: __MP = (window as any).__;
 
@@ -15,14 +16,20 @@ export enum TypeList {
     logtext = "logtext",
     color = "color",
     image = "image",
-    asset = "asset"
+    asset = "asset",
+    check = "check"
 }
 
 export type TPageProp = {
-    type: TypeList;
-    name: string;
-    label: string;
-    value: string;
+    disabled?: boolean
+    type: TypeList
+    selectedType?: any
+    name: string
+    placeholder?: string
+    label: string
+    value?: string
+    default?: string
+    [key: string]: any
 }
 
 export type TPage = {
@@ -53,27 +60,22 @@ type TPageContext = {
     setReload: React.Dispatch<React.SetStateAction<boolean>>;
     isEditLayerOpen: boolean;
     setIsEditLayerOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    isReload: boolean
     [key: string]: any
 }
+
 
 const PageContext = createContext<TPageContext>({} as TPageContext);
 export const usePageContext = () => useContext(PageContext);
 
 const PageProvider = ({ editor, children }: { editor: Editor, children?: React.ReactNode }) => {
-    const pageKeys = ["id", "name", "title", "description", "route", "components", "styles", "header", "post_date", "update_date", "isChanged"];
+
+
+    const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
+
     const [pages, setPages] = useState<TPage[]>([]);
     const [current, setCurrent] = useState<TPage | null>(null);
     const [isEditLayerOpen, setIsEditLayerOpen] = useState<boolean>(false);
     const [reload, setReload] = useState<boolean>(true);
-    const [isReload, setIsReload] = useState<boolean>(false);
-
-    useEffect(() => {
-        if (isReload) {
-            const timeout = setTimeout(() => setIsReload(false), 1500);
-            return () => clearTimeout(timeout);
-        }
-    }, [isReload]);
 
 
     const fetchPages = (callback: (pages: TPage[]) => void) => {
@@ -88,15 +90,54 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
             });
     }
 
+    // update request handler
+    const updatePagesRecords = () => {
+        return new Promise<TPage[]>((acc, rej) => {
+            fetchPages((pages) => {
+                const newpages = pages.map(p => {
+                    p.properties = convertKeysToCamelCase(p.properties);
+                    return p;
+                });
+                setPages(newpages);
+                acc(newpages);
+            });
+        })
+    }
+
+
     const resetCallback = () => {
-        fetchPages((pages) => {
-            setPages(pages);
+        updatePagesRecords().then((pages) => {
             const foundPage = pages.find(p => p.name === current?.name);
             if (foundPage) {
+                editor.setStyle(foundPage.styles);
+                editor.setComponents(foundPage.components);
+                setCurrent(current => current ? { ...current, ...foundPage } : null);
+            }
+        })
+    }
+
+
+    const removeCallback = () => {
+        // filter records pages 
+        setPages(pages => pages.filter(p => p.name != current?.name));
+        const indexPage = pages.find(p => p.name.toLocaleLowerCase() == "website/index");
+        editor.setStyle(indexPage?.styles || "");
+        editor.setComponents(indexPage?.components || []);
+        setCurrent(indexPage ?? null);
+    }
+
+
+    const addCallback = (newp: TPage) => {
+        updatePagesRecords().then((pages) => {
+            const foundPage = pages.find(p => p.name === newp?.name);
+            if (foundPage) {
+                editor.setStyle(foundPage.styles);
+                editor.setComponents(foundPage.components);
                 setCurrent(foundPage);
             }
-        });
+        })
     }
+
 
     const startCustomize = (page: TPage) => {
         const foundPage = pages.find(p => p.name === current?.name);
@@ -132,34 +173,47 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
 
     }
 
-    const loadInitialCustomize = useCallback(() => {
+
+    const loadInitialCustomize = useCallback((pages: TPage[]) => {
+
         const storageCustomizeName = window.localStorage.getItem('customize-page');
         const foundPage = storageCustomizeName ? pages.find(page => page.name === storageCustomizeName) : null;
-        startCustomize(foundPage || pages.sort((a, b) => a.route.localeCompare(b.route))[0]);
-    }, [pages, startCustomize]);
+        const initPage = foundPage || pages.sort((a, b) => a.route.localeCompare(b.route))[0];
+        setCurrent(initPage);
 
-    useEffect(() => {
-        if (reload) {
-            fetchPages((pgs) => {
-                setPages(pgs);
-                setIsReload(true);
-                setReload(false);
-            });
+        if (initPage) {
+            editor.Components.clear();
+            editor.StyleManager.clear();
+            editor.setStyle(initPage.styles);
+            editor.setComponents(initPage.components);
         }
-    }, [reload]);
+    }, [startCustomize]);
+
+
+
+    // load initial data and setPages
+    useEffect(() => {
+        if (isFirstLoad) updatePagesRecords().then((pages) => {
+            loadInitialCustomize(pages);
+            setIsFirstLoad(false);
+        });
+    }, [isFirstLoad]);
+
 
     useEffect(() => {
-        if (current === null) {
-            loadInitialCustomize();
-        } else {
-            const foundPage = pages.find(p => p.name === current.name);
-            if (foundPage) {
-                foundPage.isChanged = deepCompare(current, foundPage);
+        if (!isFirstLoad) {
+            if (current === null) {
+                loadInitialCustomize();
+            } else {
+                const foundPage = pages.find(p => p.name === current.name);
+                if (foundPage) {
+                    foundPage.isChanged = deepCompare(current, foundPage);
+                }
+                window.localStorage.setItem('customize-page', current.name);
+                __.Editor.callbackHandler = handleSaveCallback;
             }
-            window.localStorage.setItem('customize-page', current.name);
-            __.Editor.callbackHandler = handleSaveCallback;
         }
-    }, [current, loadInitialCustomize]);
+    }, [current]);
 
     const reorderJsonKeys = (data: any): any => {
         if (Array.isArray(data)) {
@@ -202,7 +256,7 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
             const value2 = obj2[key];
             const currentPath = [...path, key];
 
-            if (_.isEqual(value1, value2)) {
+            if (value1 == value2 || (typeof value1 == "undefined" && isEmpty(value2)) || (typeof value2 == "undefined" && isEmpty(value1))) {
                 return;
             }
 
@@ -212,6 +266,9 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
                     differences[currentPath.join('.')] = nestedDifferences;
                 }
             } else {
+                if (value1 == value2) return;
+                // console.log(key, value1);
+                // console.log(key, value2);
                 differences[currentPath.join('.')] = { obj1: value1, obj2: value2 };
             }
         });
@@ -235,10 +292,14 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
             clone.styles = editor.getCss();
 
             __.Website.Pages.handle("save", clone)
-                .then((e) => {
+                .then((e: any) => {
                     this.resolve("Save successful");
-                    setCurrent({ ...current, ...{ id: e.id } })
-                    setReload(true);
+                    updatePagesRecords().then((pages) => {
+                        let findIndex = pages.find(o => o.id == e.id);
+                        if (findIndex) {
+                            setCurrent(current => current ? { ...current, ...findIndex } : null);
+                        }
+                    });
                 })
                 .catch((err: string) => {
                     this.reject(err || "Failed save page!");
@@ -273,8 +334,7 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
         setReload,
         isEditLayerOpen,
         setIsEditLayerOpen,
-        isReload,
-        resetCallback
+        resetCallback, removeCallback, addCallback
     }
 
     const rootRefs = useRef<Map<HTMLElement, ReactDOM.Root>>(new Map());

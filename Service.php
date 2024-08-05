@@ -19,8 +19,9 @@ class Service extends __Fragment
     function onInit()
     {
 
-        // $this->module->data->get("page-properties.json")->listenOn("getContent", function (&$data) {
-        //     $data[] = "Hallo World";
+        // custom hook each fragment or module 
+        // $this->module->data->Pages->listenOn("renderProperties", function (&$data) {
+        //     error_log(print_r($data, 1));
         // });
         $this->migrateTable();
     }
