@@ -52,7 +52,7 @@ const AssetItem = ({ asset }: { asset: any }) => {
     function handleDelete(asset: TAsset) {
         __.dialog.danger("Are you sure?", `are you sure you want to delete the asset <b>${asset.name}</b>, this action cannot be restored!.`)
             .then(() => {
-                __.http.post((window as any).access_path("api/Website/Assets/rmpop"), asset.id)
+                __.http.post((window as any).access_path("api/Website/Assets/rmpop"), {id: asset.id})
                     .then(e => {
                         if ((e as any).status) {
                             __.toast("Success remove asset", 5, "text-success");
