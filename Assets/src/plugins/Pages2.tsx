@@ -1,10 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Editor } from "grapesjs";
-import Container from "./components/pages-container";
-import Header from "./components/pages-header";
+import Container from "./components/pages/pages-container";
+import Header from "./components/pages/pages-header";
 import { __MP } from "../../../../../Buildin/src/main";
-import FormContainer from "./components/pages-form";
+import FormContainer from "./components/pages/pages-form";
 import { debounce, isEmpty } from "lodash";
 import _ from "underscore";
 import { convertKeysToCamelCase } from "../partials/converter";

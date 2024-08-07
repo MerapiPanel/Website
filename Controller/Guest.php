@@ -73,7 +73,7 @@ class Guest extends __Fragment
                 HTML;
                 $twig = View::getInstance()->getTwig();
                 $template = $twig->createTemplate($html, "template");
-    
+
                 $_variables["_page"] = $page;
                 $_variables["_request"] = Request::getInstance();
                 $_variables["_lang"] = $lang;
@@ -85,11 +85,21 @@ class Guest extends __Fragment
                     $page_path = Request::getInstance()->getPath();
                     $page_title = $this->getTitleFromHtml($output);
                     $module->Logs->write($client_ip, $page_path, $page_title);
-                } catch (\Throwable $th) {
+                } catch (\Throwable $t) {
                     // silent
+                    error_log($t->getMessage());
                 }
 
-                return View::minimizeHTML($output);
+                $minimizeOutput = View::minimizeHTML($output);
+                foreach ($this->shortCodeFinder($minimizeOutput) as $code) {
+                    // call api for render short code
+                    $shortcode_render = $this->module->Pages->shortcode($code);
+                    if ($shortcode_render && $shortcode_render != $code) {
+                        $minimizeOutput = str_replace("[$code]", $shortcode_render, $minimizeOutput);
+                    }
+                }
+
+                return $this->module->Pages->render($minimizeOutput, $page);
             });
         }
     }
@@ -113,6 +123,15 @@ class Guest extends __Fragment
         return $output;
     }
 
+    private function shortCodeFinder($html)
+    {
+        // Define the regex pattern to match the shortcode
+        $pattern = '/\[([a-z]{1}[a-z0-9.]*)\]/mi';
+        // Find all matches of the pattern in the HTML
+        preg_match_all($pattern, $html, $matches);
+        // Return the array of shortcodes found
+        return $matches[1] ?? [];
+    }
 
 
     private static function cleanTwigFragmentFromHtml(&$html)

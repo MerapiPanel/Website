@@ -24,6 +24,69 @@ class Pages extends __Fragment
     }
 
 
+    /**
+     * Summary of render
+     * help other module to use api listen on page render
+     * @param mixed $htmlstring
+     * @param mixed $page
+     * @return mixed
+     */
+    public function render($htmlstring, $page)
+    {
+        return $htmlstring;
+    }
+
+
+    /**
+     * Summary of shortcode
+     * api used for other module to render their short codes
+     * @param mixed $code
+     * @param mixed $result
+     * @return mixed
+     */
+    public function shortcode($code)
+    {
+        $result = false;
+        $view = View::getInstance();
+        try {
+
+            $module  = preg_replace('/\..*$/m', '', $code);
+            $path    = Path::join("shortcode", preg_replace('/^\w+\./m', '', $code));
+            $wrapper = $view->load("@$module/$path.twig");
+
+            try {
+
+                // Check if the template extends another template
+                $templateSource = $view->getLoader()->getSourceContext("@$module/$path.twig")->getCode();
+                $extends = preg_match('/\{\%\s*extends\s+[\'"]([^\'"]+)[\'"]\s*\%\}/', $templateSource, $matches);
+                if ($extends) throw new Exception("shortcode not allowed extend other template");
+                return $wrapper->render();
+            } catch (Throwable $t) {
+                if ($wrapper->hasBlock("error")) {
+                    return $wrapper->renderBlock("error", ["error" => [
+                        "message" => $t->getMessage(),
+                        "line"    => $t->getLine(),
+                        "file"    => $t->getFile()
+                    ]]);
+                } else {
+
+                    return <<<HTML
+                    <div class="bg-danger bg-opacity-10 p-3 rounded-2">
+                        <div class="fs-4 fw-semibold">Caught an Error</div>
+                        <p>{$t->getMessage()}</p>
+                    </div>
+                    HTML;
+                }
+            }
+        } catch (Throwable $t) {
+            // silent
+            error_log($t->getMessage());
+        }
+
+        return $result;
+    }
+
+
 
     function renderProperties($properties)
     {
@@ -264,7 +327,9 @@ class Pages extends __Fragment
             }
             $listpops = $this->listpops();
             $filter   = array_filter($listpops, fn ($p) => $p['name'] == $name);
-            if (empty($filter)) throw new Exception("Page {$name} not found", 404);
+            if (empty($filter)) {
+                throw new Exception("Page {$name} not found", 404);
+            }
             return array_values($filter)[0];
         }
     }
@@ -307,16 +372,30 @@ class Pages extends __Fragment
         $properties_string = json_encode($this->filterProperty($properties_array));
 
 
-        $SQL = "INSERT INTO pages (name, title, description, route, components, styles, properties) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $SQL = <<<SQL
+        INSERT INTO pages 
+            (`name`, `title`, `description`, `route`, `components`, `styles`, `properties`) 
+        VALUES 
+            (:name, :title, :description, :route, :components, :styles, :properties)
+        ON DUPLICATE KEY UPDATE 
+            `name`=:name, 
+            `title`=:title, 
+            `description`=:description, 
+            `route`=:route, 
+            `components`=:components, 
+            `styles`=:styles, 
+            `properties`=:properties
+        SQL;
+
         $stmt = DB::instance()->prepare($SQL);
         if ($stmt->execute([
-            $name,
-            $title,
-            $description,
-            $route,
-            $components_string,
-            $styles,
-            $properties_string
+            "name" => $name,
+            "title" => $title,
+            "description" => $description,
+            "route" => $route,
+            "components" => $components_string,
+            "styles" => $styles,
+            "properties" => $properties_string
         ])) {
 
             return [

@@ -9,6 +9,7 @@
 
 	.patterns-manager .gjs-block {
 		width: 100%;
+		flex-basis: 210px;
 	}
 </style>
 {% endblock %}
@@ -16,22 +17,18 @@
 {% block config %}
 {{ editor_config({
 	config: {
-	width: "100vw",
-	height: "100vh",
-	container: "#editor",
-	canvas: {
-		styles: [
-			"/vendor/bootstrap/css/bootstrap.min.css" | assets
-		],
-		scripts: [
-			"/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets
-		]
-	},
-	pluginsOpts: {
-		CodeEditor: {
-			editable: true
-		}
-	},
+		width: "100vw",
+		height: "100vh",
+		container: "#editor",
+		canvas: {
+			styles: ["/vendor/bootstrap/css/bootstrap.min.css" | assets],
+			scripts: ["/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets]
+		},
+		pluginsOpts: {
+			CodeEditor: {
+				editable: true
+			}
+		},
 		assetManager: {
 			custom: true,
 			assets: [],
@@ -46,21 +43,13 @@
 
 {% block javascript %}
 {{ parent() }}
-
 <script>
-
 	__.Website = {
 		Pattern: {},
 		Pages: {
 			o: {}
 		}
 	}
-	__.Website.Pattern.listpops = function (callback) {
-		fetch("{{'/api/Website/Patterns/listpops'|access_path}}")
-			.then(response => response.json())
-			.then(response => callback(response.data));
-	}
-
 	__.Website.Pages.handle = (type, page) => {
 
 		return new Promise((accept, reject) => {
@@ -147,6 +136,73 @@
 			}
 			handle[type]();
 		})
+	}
+
+	__.Website.Pattern.handle = function (type, pattern) {
+
+		return new Promise((accept, reject) => {
+			const handle = {
+
+				fetch: () => {
+					fetch("{{'/api/Website/Patterns/listpops'|access_path}}")
+						.then(response => response.json())
+						.then(response => {
+							accept(response.data);
+						}).catch(err => reject(err.message || "Unknown error"))
+				},
+
+				remove: () => {
+					__.http.post("{{ '/api/Website/Patterns/removepop'| access_path }}", {
+						name: pattern.name
+					}).then(function (response) {
+						if (response.status) {
+							accept(response.data);
+						} else {
+							reject(response.message || "Error: Please try again!");
+						}
+					}).catch(error => {
+						reject(error);
+					});
+				},
+
+				save: () => {
+					const formData = new FormData();
+					Object.keys(pattern).forEach((key) => {
+						const value = pattern[key];
+						if (typeof value == "object" && !Array.isArray(value)) {
+							formData.append(key, JSON.stringify(value));
+						} else if (Array.isArray(value)) {
+							for (let i = 0; i < value.length; i++) {
+								let item = value[i];
+								if (typeof item == "object" || Array.isArray(item)) {
+									Object.keys(item).forEach((k) => {
+										formData.append(`${key}[${i}][${k}]`, item[k]);
+									});
+								} else {
+									formData.append(`${key}[${i}]`, item);
+								}
+							}
+						} else {
+							formData.append(key, pattern[key]);
+						}
+					});
+
+					__.http.post("{{'/api/Website/Patterns/addpop'|access_path|url}}", formData)
+						.then((result) => {
+							if (result.status) {
+								accept(result.data);
+							} else {
+								reject(result.message || "Failed to save pattern");
+							}
+						}).catch(err => reject(err.message || "Failed save pattern!"))
+				}
+			}
+
+			if (!Object.keys(handle).includes(type)) {
+				reject("Unknown type handle {" + type + "}");
+			}
+			handle[type]();
+		});
 	}
 </script>
 

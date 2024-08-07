@@ -1,5 +1,6 @@
 {
-    "label": "navbar",
+    "name": "navbar",
+    "label": "navbar packaged",
     "media": "<img width='150px' src='/public/assets/Website/img/navbar.jpg'/>",
     "content": {
         "type": "bs-navbar",

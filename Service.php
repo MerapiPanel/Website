@@ -3,6 +3,7 @@
 namespace MerapiPanel\Module\Website;
 
 use MerapiPanel\Box\Module\__Fragment;
+use MerapiPanel\Box\Module\Entity\Module;
 use MerapiPanel\Database\DB;
 use PDO;
 
@@ -11,7 +12,7 @@ class Service extends __Fragment
 
     protected $module;
 
-    function onCreate(\MerapiPanel\Box\Module\Entity\Module $module)
+    function onCreate(Module $module)
     {
         $this->module = $module;
     }

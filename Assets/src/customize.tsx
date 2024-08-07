@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { AddComponentTypeOptions, BlockManagerConfig, Component, Editor, EditorConfig } from "grapesjs";
 import { __MP } from "../../../../Buildin/src/main";
 // import * as Pages from "./plugins/Pages";
-import * as Fragments from "./plugins/Patterns";
+import Patterns, * as Fragments from "./plugins/Patterns";
 import { GAssets, TAsset } from "./components/gassets";
 
 
@@ -390,7 +390,11 @@ function initPagesManager(editor: Editor) {
         )
 }
 
+
 function initPatternsManager(editor: Editor) {
+
+    const patternsContainer = $(`<div class="editor-layout patterns-manager hide p-2 flex-wrap gap-2">`);
+    $(".editor-sidebar").append(patternsContainer);
 
     editor.Panels.addButton("sidebar-panel", {
         id: "patterns",
@@ -407,13 +411,12 @@ function initPatternsManager(editor: Editor) {
         }
     });
 
-
-    const patternsContainer = $(`<div class="editor-layout patterns-manager hide p-2 flex-wrap gap-2">`);
-    $(".editor-sidebar").append(patternsContainer);
-
-    Fragments.Register(editor, {
-        appendTo: ".patterns-manager"
-    });
+    ReactDOM.createRoot(patternsContainer[0] as any)
+        .render(
+            <React.StrictMode>
+                <Patterns editor={editor} />
+            </React.StrictMode>
+        )
 }
 
 
