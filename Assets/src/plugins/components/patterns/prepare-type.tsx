@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect } from "react";
-import { Editor } from "grapesjs";
-import { usePatternContext } from "../../Patterns";
+import { Pattern, usePatternContext } from "../../Patterns";
+import { __MP } from "../../../../../../../Buildin/src/main";
+import { title } from "process";
+import { Customization } from "../../../partials/pattern-customization";
 
+const __: __MP = (window as any).__;
 
 const options = {
     removable: false,
@@ -34,16 +37,71 @@ const options = {
 
     // Allow to edit the content of the component (used on Text components)
     editable: false,
-    selectable: false,
+    selectable: true,
 }
 
 
 export const PrepareType = () => {
 
     const { editor } = usePatternContext();
+    const defaultType = editor.DomComponents.getType('default');
+
+    editor.Commands.add("detacth-pattern", {
+        run(editor, sender, options) {
+            const selected = editor.getSelected();
+            if (selected) {
+                const parent = selected.parent(); // Get the parent component
+                const components = selected.getChildAt(0).components(); // Get child components
+
+                if (parent && components.length) {
+                    const index = selected.index() // Get the index of the selected component
+
+                    // Loop through each child component and insert it at the selected component's position
+                    components.each((component, i) => {
+                        parent.components().add(JSON.parse(JSON.stringify(component)), { at: index + i });
+                    });
+
+                    // Remove the selected component after inserting its children
+                    selected.remove();
+                    editor.refresh();
+                }
+            }
+        }
+    });
+    editor.Commands.add("customize-pattern", {
+        run(editor, sender, options) {
+            const selected = editor.getSelected();
+            if (selected) {
+                const name = (selected.get("attributes") || [])['pattern-name'] || null;
+                if (name) {
+                    let findPattern = (__.Website.Pattern.data as Pattern[]).find(e => e.name == name);
+                    if (findPattern) {
+                        let oldCallback = __.Website.Pattern.Customization.closeCallback;
+                        __.Website.Pattern.Customization.closeCallback = function () {
+                            __.Website.Pattern.Customization.updateRecords();
+                            __.Website.Pattern.Customization.closeCallback = oldCallback;
+                        }
+                        Customization(editor).start(findPattern);
+                    }
+                }
+            }
+        }
+    });
 
 
     const AddType = useCallback(() => {
+
+        editor.Components.addType("pattern-wrapper", {
+            model: {
+                defaults: {
+                    ...options,
+                    locked: true,
+                    components: [],
+                    traits: [],
+                    toolbar: []
+                }
+            }
+        })
 
         editor.Components.addType("pattern", {
             model: {
@@ -55,55 +113,102 @@ export const PrepareType = () => {
                     draggable: true,
                     removable: true,
                     components: [],
-                    traits: [
-                        {
-
-                        },
-                        {
-                            type: 'button',
-                            text: 'Reset',
-                            full: true, // Full width button
-                            command: editor => { alert('Hello') },
-                        }],
+                    traits: [],
                     toolbar: [
                         {
-                            attributes: { class: 'fa fa-pen-nib' },
-                            command: {
-                                run() {
-
-                                }
+                            attributes: {
+                                class: 'fa fa-pen-nib',
+                                title: "Customizing"
                             },
+                            command: "customize-pattern"
                         },
                         {
-                            attributes: { class: 'fa fa-link-slash' },
-                            command: 'tlb-move',
+                            attributes: {
+                                class: 'fa fa-link-slash',
+                                title: "detacth pattern"
+                            },
+                            command: "detacth-pattern"
                         },
                         {
-                            attributes: { class: 'fa fa-trash' },
+                            attributes: {
+                                class: 'fa fa-trash',
+                                title: 'remove component'
+                            },
                             command: 'tlb-delete',
                         }
                     ],
+
                 },
                 init() {
-                    setTimeout(() => this.applyConfigToChild(this.get("components") || []), 300);
-                },
-                applyConfigToChild(components: any = []) {
-                    components.forEach(component => {
-                        component.set({ ...options, toolbar: [], traits: [] });
-                        const childComponents = component.components();
-                        if (childComponents.length) {
-                            this.applyConfigToChild(childComponents.models);
+                    const name = this.get("attributes")['pattern-name'] || null;
+
+                    __.Website.Pattern.on("update", (e: Event, patterns: Pattern[]) => {
+                        const pattern = patterns.find(e => e.name == name);
+                        if (pattern) {
+                            this.components([
+                                {
+                                    type: "pattern-wrapper",
+                                    components: pattern.components
+                                }
+                            ]);
+                            this.view.render();
                         }
                     });
-                },
+
+                    setTimeout(() => {
+                        let findPattern = (__.Website.Pattern.data as Pattern[]).find(e => e.name == name);
+                        if (findPattern) {
+                            this.components([
+                                {
+                                    type: "pattern-wrapper",
+                                    components: findPattern.components
+                                }
+                            ]);
+                            this.view.render();
+                        }
+                    }, 100);
+                }
             },
-            view: {
+            view: defaultType.view.extend({
+                events: {
+                    dblclick: () => {
+                        editor.runCommand("customize-pattern");
+                    }
+                },
                 render() {
+
                     this.$el.addClass("pattern-block");
                     this.renderChildren();
+                    if (this.model.get("components").length < 1) {
+                        this.$el.append($(`<div class='py-5 text-center text-muted'>Empty Pattern</div>`));
+                    }
+                    this.$el.css({ position: "relative" })
+                    const label = $(`<span>${this.model.get("attributes")["pattern-name"] || "Unknown Pattern"}</span>`)
+                        .css({
+                            position: "absolute",
+                            color: "white",
+                            left: 0,
+                            padding: ".1rem 1rem",
+                            background: "#da86a2 ",
+                            fontSize: "10px"
+                        })
+                    this.$el
+                        .on("mouseenter", () => {
+                            if (this.model.index() <= 0) {
+                                label.css({
+                                    bottom: "-1.2rem",
+                                    top: "unset"
+                                })
+                            }
+                            this.$el.append(label);
+                        })
+                        .on("mouseleave", () => {
+                            label.remove();
+                        })
+
                     return this;
                 }
-            }
+            })
         });
 
         const doc = editor.Canvas.getDocument();

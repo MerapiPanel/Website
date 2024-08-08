@@ -74,8 +74,10 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
 
     const [pages, setPages] = useState<TPage[]>([]);
     const [current, setCurrent] = useState<TPage | null>(null);
+    const [currentName, setCurrentName] = useState<string | null>(null);
     const [isEditLayerOpen, setIsEditLayerOpen] = useState<boolean>(false);
     const [reload, setReload] = useState<boolean>(true);
+
 
 
     const fetchPages = (callback: (pages: TPage[]) => void) => {
@@ -99,7 +101,7 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
                     return p;
                 });
                 setPages(newpages);
-                acc(newpages);
+                setTimeout(() => acc(newpages), 200);
             });
         })
     }
@@ -140,7 +142,11 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
 
 
     const startCustomize = (page: TPage) => {
-        const foundPage = pages.find(p => p.name === current?.name);
+
+        const foundPage = pages.find(p => p.name === page?.name);
+        if (!foundPage) {
+            return;
+        }
         if (foundPage?.isChanged) {
             __.dialog.warning("Are you sure?", "You have unsave changes, move page will discard the changes.")
                 .then(() => {
@@ -153,7 +159,6 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
         process();
 
         function process() {
-            const foundPage = pages.find(p => p.name === page.name);
             if (foundPage) {
                 setCurrent(foundPage);
                 window.localStorage.setItem('customize-page', foundPage.name);
@@ -167,51 +172,42 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
                     'min-height': '100vh',
                     'display': 'block'
                 });
+                if (isEditLayerOpen) setIsEditLayerOpen(false);
             }
-            if (isEditLayerOpen) setIsEditLayerOpen(false);
         }
-
     }
 
 
-    const loadInitialCustomize = useCallback((pages: TPage[]) => {
-
-        const storageCustomizeName = window.localStorage.getItem('customize-page');
-        const foundPage = storageCustomizeName ? pages.find(page => page.name === storageCustomizeName) : null;
-        const initPage = foundPage || pages.sort((a, b) => a.route.localeCompare(b.route))[0];
-        setCurrent(initPage);
-
-        if (initPage) {
-            editor.Components.clear();
-            editor.StyleManager.clear();
-            editor.setStyle(initPage.styles);
-            editor.setComponents(initPage.components);
+    // initial customization pages
+    useEffect(() => {
+        if ((pages || []).length && isFirstLoad) {
+            const storageCustomizeName = window.localStorage.getItem('customize-page');
+            const foundPage = storageCustomizeName ? pages.find(page => page.name === storageCustomizeName) : null;
+            const initPage = foundPage || pages.sort((a, b) => a.route.localeCompare(b.route))[0];
+            startCustomize(initPage);
+            setIsFirstLoad(false);
         }
-    }, [startCustomize]);
-
-
+    }, [pages, isFirstLoad]);
 
     // load initial data and setPages
     useEffect(() => {
-        if (isFirstLoad) updatePagesRecords().then((pages) => {
-            loadInitialCustomize(pages);
-            setIsFirstLoad(false);
-        });
+        if (isFirstLoad) updatePagesRecords();
     }, [isFirstLoad]);
 
 
     useEffect(() => {
         if (!isFirstLoad) {
-            if (current === null) {
-                loadInitialCustomize();
-            } else {
+            if (current !== null) {
                 const foundPage = pages.find(p => p.name === current.name);
                 if (foundPage) {
                     foundPage.isChanged = deepCompare(current, foundPage);
                 }
                 window.localStorage.setItem('customize-page', current.name);
-                __.Editor.callbackHandler = handleSaveCallback;
             }
+        }
+        if (current?.name && currentName != current?.name) {
+            __.Editor.callbackHandler = handleSaveCallback;
+            setCurrentName(current?.name || null);
         }
     }, [current]);
 
@@ -286,25 +282,24 @@ const PageProvider = ({ editor, children }: { editor: Editor, children?: React.R
     }
 
     const handleSaveCallback = function () {
-        if (current) {
-            const clone = JSON.parse(JSON.stringify(current));
-            clone.components = JSON.stringify(editor.getComponents());
-            clone.styles = editor.getCss();
 
-            __.Website.Pages.handle("save", clone)
-                .then((e: any) => {
-                    this.resolve("Save successful");
-                    updatePagesRecords().then((pages) => {
-                        let findIndex = pages.find(o => o.id == e.id);
-                        if (findIndex) {
-                            setCurrent(current => current ? { ...current, ...findIndex } : null);
-                        }
-                    });
-                })
-                .catch((err: string) => {
-                    this.reject(err || "Failed save page!");
+        const clone = JSON.parse(JSON.stringify(current));
+        clone.components = JSON.stringify(editor.getComponents());
+        clone.styles = editor.getCss();
+
+        __.Website.Pages.handle("save", clone)
+            .then((e: any) => {
+                this.resolve("Save successful");
+                updatePagesRecords().then((pages) => {
+                    let findIndex = pages.find(o => o.id == e.id);
+                    if (findIndex) {
+                        setCurrent(current => current ? { ...current, ...findIndex } : null);
+                    }
                 });
-        }
+            })
+            .catch((err: string) => {
+                this.reject(err || "Failed save page!");
+            });
     }
 
     const debouncedSetValue = useCallback(

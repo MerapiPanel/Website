@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { usePatternContext } from "../../Patterns";
-import FloatingManager from "./floating-maanager";
+import FloatingManager from "./floating-manager";
 
 const PatternManager = () => {
     const { patterns, editor } = usePatternContext();
@@ -21,7 +21,7 @@ const PatternManager = () => {
         <>
             <div className="d-flex text-start mb-2">
                 <div className="fw-semibold fs-5">Patterns</div>
-                <button className="btn btn-sm btn-outline-secondary ms-auto" ref={buttonRefs}>
+                <button className="btn btn-sm btn-outline-secondary ms-auto" ref={buttonRefs} id="pattern-manager-toggler">
                     <i className="fa-solid fa-up-right-from-square"></i>
                 </button>
             </div>

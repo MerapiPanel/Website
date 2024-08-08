@@ -13,13 +13,11 @@ import PatternManager from "./components/patterns/pattern-manager";
 const __: __MP = (window as any).__;
 
 export type Pattern = {
-    id?: string
-    name?: string // uniq name
+    name: string // uniq name
     label: string
-    media: any
-    content: any
+    media?: any
     components: any[]
-    isChanged: boolean
+    removable: boolean
     [key: string]: any
 }
 
@@ -30,6 +28,10 @@ type TPatternsContext = {
     [key: string]: any
     __: __MP
     addPattern: (pattern: Pattern) => void
+    removePattern: (pattern: Pattern) => void
+    savePattern: (pattern: Pattern) => void
+    openLayerManager: boolean
+    setOpenLayerManager: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 
@@ -38,20 +40,58 @@ export const usePatternContext = () => useContext(PatternsContext);
 
 const Patterns = ({ editor }: { editor: Editor }) => {
 
+    const requiredKeys = ["name", "label", "components"];
+    const [openLayerManager, setOpenLayerManager] = useState(false);
     const [patterns, setPatterns] = useState<Pattern[]>([]);
     var initial = true;
 
+
+    __.Website.Pattern.Customization = {
+        closeCallback() {
+            setOpenLayerManager(true);
+            this.updateRecords();
+        },
+        updateRecords() {
+            fetchPatterns((patterns) => {
+                setTimeout(() => __.Website.Pattern.fire("update", patterns), 100);
+            });
+        }
+    }
+
+    const cleanPatternData = (pattern: Pattern) => {
+        const clone = {};
+        Object.keys(pattern).forEach(key => {
+            if (requiredKeys.includes(key)) {
+                let val = pattern[key];
+                if (typeof val !== "string") {
+                    val = JSON.stringify(val);
+                }
+                clone[key] = val;
+            }
+        });
+        return clone;
+    }
 
     const fetchPatterns = (callback: (patterns: Pattern[]) => void = () => { }) => {
         __.Website.Pattern.handle("fetch")
             .then((patterns: Pattern[]) => {
                 if (Array.isArray(patterns)) {
                     setPatterns((patterns || []).map(pattern => {
+
+                        if (!pattern.media) {
+                            pattern.media = `<svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" fill="currentColor" class="bi bi-columns-gap" viewBox="0 0 16 16"><path d="M6 1v3H1V1zM1 0a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1zm14 12v3h-5v-3zm-5-1a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1zM6 8v7H1V8zM1 7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm14-6v7h-5V1zm-5-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1z"/></svg>`;
+                        }
+
                         pattern.content = {
                             type: "pattern",
-                            components: [pattern.content],
+                            components: [
+                                {
+                                type: "pattern-wrapper",
+                                components: pattern.components
+                            }
+                            ],
                             attributes: {
-                                "pattern-name": pattern.name
+                                "pattern-name": pattern.name,
                             }
                         }
                         return pattern;
@@ -67,7 +107,8 @@ const Patterns = ({ editor }: { editor: Editor }) => {
     }
 
     const addPattern = (pattern: Pattern) => {
-        __.Website.Pattern.handle("save", pattern)
+
+        __.Website.Pattern.handle("save", cleanPatternData(pattern))
             .then(() => {
                 __.toast("Success add pattern", 5, 'text-success');
                 fetchPatterns();
@@ -77,6 +118,32 @@ const Patterns = ({ editor }: { editor: Editor }) => {
             })
     }
 
+    const removePattern = (pattern: Pattern) => {
+        __.Website.Pattern.handle("remove", cleanPatternData(pattern))
+            .then(() => {
+                __.toast("Success remove pattern", 5, 'text-success');
+                fetchPatterns();
+            })
+            .catch((reason: string) => {
+                __.toast(reason || "Caught an error!", 5, 'text-danger');
+            })
+    }
+
+    const savePattern = (pattern: Pattern) => {
+        __.Website.Pattern.handle("save", cleanPatternData(pattern))
+            .then(() => {
+                __.toast("Success save pattern", 5, 'text-success');
+                fetchPatterns();
+            })
+            .catch((reason: string) => {
+                __.toast(reason || "Caught an error!", 5, 'text-danger');
+            })
+    }
+
+
+    useEffect(() => {
+        __.Website.Pattern.data = patterns;
+    }, [patterns]);
 
     /** INITIAL LOAD */
     useEffect(() => {
@@ -85,7 +152,8 @@ const Patterns = ({ editor }: { editor: Editor }) => {
 
     const value = {
         editor, patterns, __,
-        addPattern
+        addPattern, removePattern, savePattern,
+        openLayerManager, setOpenLayerManager
     }
 
     return (
@@ -97,163 +165,3 @@ const Patterns = ({ editor }: { editor: Editor }) => {
 }
 
 export default Patterns;
-
-// export const Register = (editor: Editor, opts: {
-//     appendTo?: string
-// } = {}) => {
-
-
-//     const blockManager = editor.BlockManager;
-//     var newBlocksEl: any;
-
-const options = {
-    removable: false,
-
-    // Indicates if it's possible to drag the component inside other
-    // Tip: Indicate an array of selectors where it could be dropped inside
-    draggable: false,
-
-    // Indicates if it's possible to drop other components inside
-    // Tip: Indicate an array of selectors which could be dropped inside
-    droppable: false,
-
-    // Set false if don't want to see the badge (with the name) over the component
-    badgable: false,
-
-    // True if it's possible to style it
-    // Tip:  Indicate an array of CSS properties which is possible to style
-    stylable: false,
-
-    // Highlightable with 'dotted' style if true
-    highlightable: false,
-
-    // True if it's possible to clone the component
-    copyable: false,
-
-    // Indicates if it's possible to resize the component (at the moment implemented only on Image Components)
-    resizable: false,
-    // Hide the component inside Layers
-    layerable: false,
-
-    // Allow to edit the content of the component (used on Text components)
-    editable: false,
-    selectable: false,
-}
-
-//     editor.Components.addType("pattern", {
-//         model: {
-//             defaults: {
-//                 ...options,
-//                 selectable: true,
-//                 highlightable: true,
-//                 layerable: true,
-//                 draggable: true,
-//                 removable: true,
-//                 components: [],
-//                 traits: [
-//                     {
-
-//                     },
-//                     {
-//                         type: 'button',
-//                         text: 'Reset',
-//                         full: true, // Full width button
-//                         command: editor => { alert('Hello') },
-//                     }],
-//                 toolbar: [
-//                     {
-//                         attributes: { class: 'fa fa-pen-nib' },
-//                         command: {
-//                             run() {
-
-//                             }   
-//                         },
-//                     },
-//                     {
-//                         attributes: { class: 'fa fa-link-slash' },
-//                         command: 'tlb-move',
-//                     },
-//                     {
-//                         attributes: { class: 'fa fa-trash' },
-//                         command: 'tlb-delete',
-//                     }
-//                 ],
-//             },
-//             init() {
-//                 setTimeout(() => this.applyConfigToChild(this.get("components") || []), 300);
-//             },
-//             applyConfigToChild(components: any = []) {
-//                 components.forEach(component => {
-//                     component.set({ ...options, toolbar: [], traits: [] });
-//                     const childComponents = component.components();
-//                     if (childComponents.length) {
-//                         this.applyConfigToChild(childComponents.models);
-//                     }
-//                 });
-//             },
-//         },
-//         view: {
-//             render() {
-//                 this.$el.addClass("pattern-block");
-//                 this.renderChildren();
-//                 return this;
-//             }
-//         }
-//     });
-
-
-
-//     editor.on('change', (e, d, c) => {
-//         const selected = editor.getSelected();
-//         // console.log(selected?.get("selectable"));
-//     })
-
-
-
-
-
-//     editor.Commands.add("pattern:customize", {
-
-//         run: function (editor, sender, opts) {
-//             console.log(opts);
-//             editor.setComponents(opts.content);
-//             adjustCanvas();
-//         }
-//     });
-
-//     // Function to adjust canvas size based on content
-//     function adjustCanvas() {
-//         const wrapper: any = editor.getWrapper();
-//         wrapper.addStyle({
-//             'min-height': '100vh',
-//             'display': 'flex',
-//             'flex-direction': 'column',
-//             'align-content': 'center',
-//             'justify-content': 'center'
-//         });
-//     }
-
-//     function render() {
-
-//         if (opts.appendTo) {
-//             const container = $(opts.appendTo);
-
-//             container.html("");
-//             container.append(
-//                 $(`<div class="d-flex justify-content-between w-100">`)
-//                     .append(
-//                         $(`<h5>Patterns</h5>`),
-//                         $(`<button type="button" class="btn btn-sm text-primary border-primary rounded-0 border py-0 m-1"><i class="fa-solid fa-gears"></i></button>`)
-//                             .on('click', () => { })
-//                     ),
-//                 $(`<div class="flex-grow-1">`)
-//                     .append(
-//                         newBlocksEl as any
-//                     )
-//             );
-//         }
-
-//     }
-
-//     render();
-// }

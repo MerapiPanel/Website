@@ -16,28 +16,28 @@
 
 {% block config %}
 {{ editor_config({
-	config: {
-		width: "100vw",
-		height: "100vh",
-		container: "#editor",
-		canvas: {
-			styles: ["/vendor/bootstrap/css/bootstrap.min.css" | assets],
-			scripts: ["/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets]
-		},
-		pluginsOpts: {
-			CodeEditor: {
-				editable: true
-			}
-		},
-		assetManager: {
-			custom: true,
-			assets: [],
-			upload: "/api/FileManager/upload" | access_path,
-			uploadName: "files",
-			fetch: "/api/FileManager/fetchFile?start=0&limit=10"|access_path
-		}
-	},
-	fetchBlockURL: "/editor/api/load" | access_path
+config: {
+width: "100vw",
+height: "100vh",
+container: "#editor",
+canvas: {
+styles: ["/vendor/bootstrap/css/bootstrap.min.css" | assets],
+scripts: ["/vendor/bootstrap/js/bootstrap.bundle.min.js" | assets]
+},
+pluginsOpts: {
+CodeEditor: {
+editable: true
+}
+},
+assetManager: {
+custom: true,
+assets: [],
+upload: "/api/FileManager/upload" | access_path,
+uploadName: "files",
+fetch: "/api/FileManager/fetchFile?start=0&limit=10"|access_path
+}
+},
+fetchBlockURL: "/editor/api/load" | access_path
 }) }}
 {% endblock %}
 
@@ -161,7 +161,7 @@
 							reject(response.message || "Error: Please try again!");
 						}
 					}).catch(error => {
-						reject(error);
+						reject(error.message || "Failed delete pattern");
 					});
 				},
 
@@ -194,7 +194,8 @@
 							} else {
 								reject(result.message || "Failed to save pattern");
 							}
-						}).catch(err => reject(err.message || "Failed save pattern!"))
+						})
+						.catch(err => reject(err.message || "Failed save pattern!"))
 				}
 			}
 

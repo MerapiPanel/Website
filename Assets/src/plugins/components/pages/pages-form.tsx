@@ -20,7 +20,7 @@ const FormContext = createContext<TFormContext>({} as TFormContext);
 export const useFormContext = () => useContext(FormContext);
 
 const FormContainer = () => {
-    const { isEditLayerOpen, current, setCurrent, setIsEditLayerOpen } = usePageContext();
+    const { isEditLayerOpen, current, setCurrent, setIsEditLayerOpen, editor } = usePageContext();
     const [title, setTitle] = useState(current?.title || "");
     const [description, setDescription] = useState(current?.description || "");
     const [route, setRoute] = useState(current?.route || "");
@@ -49,6 +49,13 @@ const FormContainer = () => {
         setCurrent(current => current ? { ...current, properties: _properties } : null);
     }, [_properties]);
 
+
+    useEffect(() => {
+
+        const button = editor.Panels.getButton('sidebar-panel', 'patterns');
+        button?.set("disable", isEditLayerOpen);
+
+    }, [isEditLayerOpen]);
 
     function clickCloseHandle() {
         setIsEditLayerOpen(false);
