@@ -91,7 +91,7 @@ export const PrepareType = () => {
 
     const AddType = useCallback(() => {
 
-        editor.Components.addType("pattern-wrapper", {
+        editor.Components.addType("website-pattern-wrapper", {
             model: {
                 defaults: {
                     ...options,
@@ -103,7 +103,7 @@ export const PrepareType = () => {
             }
         })
 
-        editor.Components.addType("pattern", {
+        editor.Components.addType("website-pattern", {
             model: {
                 defaults: {
                     ...options,
@@ -147,7 +147,7 @@ export const PrepareType = () => {
                         if (pattern) {
                             this.components([
                                 {
-                                    type: "pattern-wrapper",
+                                    type: "website-pattern-wrapper",
                                     components: pattern.components
                                 }
                             ]);
@@ -160,7 +160,7 @@ export const PrepareType = () => {
                         if (findPattern) {
                             this.components([
                                 {
-                                    type: "pattern-wrapper",
+                                    type: "website-pattern-wrapper",
                                     components: findPattern.components
                                 }
                             ]);

@@ -83,10 +83,10 @@ const Patterns = ({ editor }: { editor: Editor }) => {
                         }
 
                         pattern.content = {
-                            type: "pattern",
+                            type: "website-pattern",
                             components: [
                                 {
-                                type: "pattern-wrapper",
+                                type: "website-pattern-wrapper",
                                 components: pattern.components
                             }
                             ],

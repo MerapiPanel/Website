@@ -81,6 +81,20 @@ namespace MerapiPanel\Module\Website {
         }
 
 
+        function getpop($name)
+        {
+            $SQL = "SELECT * FROM patterns WHERE name =?";
+            $stmt = DB::instance()->prepare($SQL);
+            $stmt->execute([$name]);
+            if ($pattern = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $pattern['components'] = json_decode($pattern['components'] ?? '[]', 1);
+                return $pattern;
+            }
+            [$moduleName, $patternName] = explode("/", $name);
+            $module = Box::module($moduleName)->data->patterns->get("$patternName.json");
+            return $module->getContent();
+        }
+
 
         function removepop($name)
         {
