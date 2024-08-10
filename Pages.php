@@ -116,9 +116,9 @@ class Pages extends __Fragment
     private function generateTwitterCard($property, $properties)
     {
 
-        $ptitle = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-title"))[0] ?? false;
-        $pdesct = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-description"))[0] ?? false;
-        $pimage = array_values(array_filter($properties, fn ($prop) => $prop['name'] == "meta-image"))[0] ?? false;
+        $ptitle = array_values(array_filter($properties, fn($prop) => $prop['name'] == "meta-title"))[0] ?? false;
+        $pdesct = array_values(array_filter($properties, fn($prop) => $prop['name'] == "meta-description"))[0] ?? false;
+        $pimage = array_values(array_filter($properties, fn($prop) => $prop['name'] == "meta-image"))[0] ?? false;
 
         $title = $ptitle['value'] ?? $ptitle['default'] ?? "";
         $desct = $pdesct['value'] ?? $pdesct['default'] ?? "";
@@ -284,6 +284,11 @@ class Pages extends __Fragment
 
         $pages = array_map(function ($page) {
 
+            if (preg_match('/^[A-Z](\w+)\/.*/', $page['name'])) {
+                $moduleName = preg_replace('/\/.*$/', '', $page['name']);
+                if (!in_array($moduleName, array_keys($this->module->getLoader()->getListModule()))) return;
+            }
+
             if (isset($page['components']) && is_string($page['components'])) $page['components'] = json_decode($page['components'], true);
             if (isset($page['variables']) && is_string($page['variables'])) $page['variables'] = json_decode($page['variables'], true);
             if (!isset($page['removable'])) $page['removable'] = true;
@@ -291,15 +296,15 @@ class Pages extends __Fragment
             return $page;
         }, $pages);
 
-        $this->loged_pages = $pages;
+        $this->loged_pages = array_values(array_filter($pages));
         return $this->loged_pages;
     }
 
 
     function getpop($name = null, $id = null)
     {
+        $page = [];
         if (empty($name) && empty($id)) {
-
             return [];
         } else if ($id) {
 
@@ -311,7 +316,6 @@ class Pages extends __Fragment
                 $page['components'] = json_decode($page['components'], true);
             }
             $page['properties'] = $this->sync_properties($page["properties"]);
-            return $page;
         } else {
 
             $SQL = "SELECT * FROM pages WHERE name = ?";
@@ -323,15 +327,19 @@ class Pages extends __Fragment
                     $page['components'] = json_decode($page['components'], true);
                 }
                 $page['properties'] = $this->sync_properties($page["properties"]);
-                return $page;
             }
             $listpops = $this->listpops();
-            $filter   = array_filter($listpops, fn ($p) => $p['name'] == $name);
+            $filter   = array_filter($listpops, fn($p) => $p['name'] == $name);
             if (empty($filter)) {
                 throw new Exception("Page {$name} not found", 404);
             }
-            return array_values($filter)[0];
+            $page = array_values($filter)[0];
         }
+        if (preg_match('/^[A-Z](\w+)\/.*/', $page['name'])) {
+            $moduleName = preg_replace('/\/.*$/', '', $page['name']);
+            if (!in_array($moduleName, array_keys($this->module->getLoader()->getListModule()))) return [];
+        }
+        return $page;
     }
 
     /**

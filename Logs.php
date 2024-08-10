@@ -11,6 +11,9 @@ class Logs extends __Fragment
     function onCreate(\MerapiPanel\Box\Module\Entity\Module $module)
     {
         $this->module = $module;
+        if (!file_exists(__DIR__ . "/data/logs/")) {
+            mkdir(__DIR__ . "/data/logs/", 0777, 1);
+        }
     }
 
 
@@ -19,7 +22,7 @@ class Logs extends __Fragment
     function write($client_ip, $page_path, $page_title = "")
     {
 
-        $file = __DIR__ . "/logs/" . date("Y-m-d") . ".log";
+        $file = __DIR__ . "/data/logs/" . date("Y-m-d") . ".log";
         $logs = $this->read(date("Y-m-d"));
 
         if (!empty($logs)) {
@@ -42,7 +45,6 @@ class Logs extends __Fragment
                     return false;
                 }
             }
-
         }
         file_put_contents($file, "[" . date("Y-m-d H:i:s") . "] " . $client_ip . " - " . $page_path . " | " . $page_title . "\n", FILE_APPEND);
 
@@ -56,7 +58,7 @@ class Logs extends __Fragment
     function read($date)
     {
         $date = date("Y-m-d", strtotime($date));
-        $filePath = __DIR__ . "/logs/" . $date . ".log";
+        $filePath = __DIR__ . "/data/logs/" . $date . ".log";
         if (!file_exists($filePath)) {
             return [];
         }
@@ -107,7 +109,7 @@ class Logs extends __Fragment
         $data = [];
 
         while ($scan_date <= $end) {
-            $file = __DIR__ . "/logs/" . $scan_date . ".log";
+            $file = __DIR__ . "/data/logs/" . $scan_date . ".log";
             $name = date("M d", strtotime($scan_date));
             $data[$name] = $this->read($scan_date);
             $scan_date = date("Y-m-d", strtotime($scan_date . " +1 day"));
@@ -120,7 +122,7 @@ class Logs extends __Fragment
     function delete($date)
     {
         $date = date("Y-m-d", strtotime($date));
-        $file = __DIR__ . "/logs/" . $date . ".log";
+        $file = __DIR__ . "/data/logs/" . $date . ".log";
         if (file_exists($file)) {
             unlink($file);
         }
@@ -131,7 +133,7 @@ class Logs extends __Fragment
 
     function deleteOld()
     {
-        $files = glob(__DIR__ . "/logs/*");
+        $files = glob(__DIR__ . "/data/logs/*");
         foreach ($files as $file) {
             // delete files older than 1 months
             if (date("Y-m-d", filemtime($file)) < date("Y-m-d", strtotime("-1 months"))) {
